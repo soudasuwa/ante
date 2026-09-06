@@ -41,6 +41,13 @@ jobs:
           cargo clippy --all-targets -- -D warnings
           cargo test
 
+      - name: ante-registry contract — fmt / clippy / test
+        working-directory: contracts/ante-registry
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
   wasm:
     runs-on: ubuntu-latest
     steps:
@@ -55,9 +62,10 @@ jobs:
       - name: build the delegate WASM (with the reproducibility check)
         run: ./scripts/build-delegate.sh
 
-      - name: build the example contract WASM
-        working-directory: examples/guestbook-contract
-        run: cargo build --release --target wasm32-unknown-unknown
+      - name: build the example + registry contract WASM
+        run: |
+          (cd examples/guestbook-contract && cargo build --release --target wasm32-unknown-unknown)
+          (cd contracts/ante-registry && cargo build --release --target wasm32-unknown-unknown)
 
   web:
     runs-on: ubuntu-latest

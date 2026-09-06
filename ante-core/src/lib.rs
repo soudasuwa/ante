@@ -42,6 +42,7 @@
 pub mod pow;
 pub mod proof;
 pub mod protocol;
+pub mod registry;
 
 #[doc(hidden)]
 pub mod testvec;

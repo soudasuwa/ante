@@ -19,8 +19,11 @@ Verifying is one blake3 hash and one signature check.
 ## Layout
 
 ```
-ante-core/      the primitive + AnteProof + verify  (no freenet-stdlib dependency)
+ante-core/      the primitive + AnteProof + verify + the registry CRDT
+                (no freenet-stdlib dependency — a verifier links only this)
 ante-delegate/  the Freenet delegate: key custody + consent prompt + signing (→ WASM)
+contracts/
+  ante-registry/        records each identity's best identity-level proof (→ WASM)
 web/            identity-management UI: create an identity, grind bits, hold proofs
 tools/          delegate-key: compute a delegate's address from its WASM
 scripts/        build-delegate.sh, sync-delegate.sh
@@ -30,12 +33,13 @@ examples/
 
 ## Status
 
-**Phase 1** — the delegate, the primitive, and the UI. A proof is held by
-whoever receives it.
+**Phase 1** (works end to end) — the delegate, the primitive, and the UI. An
+app gets an `AnteProof` per action, ground on demand.
 
-**Phase 2** (not started) — a registry contract that records each identity's
-best proof, so apps can read a level without a fresh grind. The two ship
-together; Phase 1 is not independently useful.
+**Phase 2** (contract done; UI wiring + publish pending) — `ante-core::registry`
+and `contracts/ante-registry/`: an identity publishes its level once, and an
+app reads it with a plain contract GET (`RegistryState::level(vk)`) instead of
+triggering a grind. Monotonic — you raise your level, never lower it.
 
 ## Verifying a proof (consumer side)
 

@@ -1,0 +1,35 @@
+[package]
+name = "ante-registry-contract"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/soudasuwa/ante"
+publish = false
+description = "Freenet contract: records each identity's best ante identity-level proof."
+
+# Own workspace root: keeps its own Cargo.lock so a workspace `cargo update`
+# cannot change the WASM bytes and re-key the contract.
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["freenet-main-contract"]
+freenet-main-contract = []
+
+[dependencies]
+ante-core = { path = "../../ante-core" }
+freenet-stdlib = { version = "=0.8.5", features = ["contract"] }
+ciborium = "0.2"
+serde = "1"
+
+[dev-dependencies]
+ed25519-dalek = { version = "2.1", features = ["serde"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
