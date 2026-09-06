@@ -55,14 +55,18 @@ pub struct RegistryDelta {
 /// **Known limit: this is linear in the number of registered identities.** A
 /// summary ships to every interested peer on every anti-entropy heartbeat
 /// (~5 min) whether or not anything changed, so its size is a standing
-/// bandwidth cost, not a per-update one. Each entry costs ~42 CBOR bytes
-/// (a 32-byte key encodes as a 34-byte array header + bytes, plus 1–5 for the
-/// u32), so:
+/// bandwidth cost, not a per-update one. Measured at **~64 bytes per entry**
+/// with realistic (hash-like) keys — ciborium encodes `[u8; 32]` as a CBOR
+/// array of 32 integers, and ~91% of random bytes need two bytes each, so one
+/// key alone costs ~63:
 ///
 /// | identities | summary |
 /// |---|---|
-/// | 1 000 | ~42 KB |
-/// | 10 000 | ~420 KB |
+/// | 1 000 | ~64 KB |
+/// | 10 000 | ~644 KB |
+///
+/// (Measure with realistic keys, never `0..N` — small integers encode in one
+/// byte and understate the real cost by a third.)
 ///
 /// That is fine at the scale this is built for and untenable past roughly
 /// 5 000 identities. The fix, when it is needed, is the standard one: replace

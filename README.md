@@ -16,6 +16,11 @@ Verifying is one blake3 hash and one signature check.
 > resourced adversary is not this project's job — ghost keys and reputation
 > systems sit above it. See [DESIGN.md](DESIGN.md).
 
+📄 **[WHITEPAPER.md](WHITEPAPER.md)** — the full account: why proof of work,
+every design decision and the reasoning behind it, exact wire formats, the
+failure modes we hit, the threat model, and what we would do next. Written to
+be enough to rebuild the system from.
+
 ## Layout
 
 ```
