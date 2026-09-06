@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: workspace — fmt / clippy / test
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+
+      # The delegate and the example contract are separate crates (own
+      # Cargo.lock) so a workspace `cargo update` cannot re-key them. Check
+      # each on its own.
+      - name: ante-delegate — fmt / clippy / test
+        working-directory: ante-delegate
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - name: guestbook example — fmt / clippy / test
+        working-directory: examples/guestbook-contract
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      # build-delegate.sh also greps the WASM for absolute registry paths and
+      # fails if any leaked — the reproducibility guard.
+      - name: build the delegate WASM (with the reproducibility check)
+        run: ./scripts/build-delegate.sh
+
+      - name: build the example contract WASM
+        working-directory: examples/guestbook-contract
+        run: cargo build --release --target wasm32-unknown-unknown
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: cross-impl guard (TS verifier vs the pinned Rust vector)
+        run: npm test
+      - name: bundle build
+        run: npm run build

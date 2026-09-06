@@ -1,5 +1,7 @@
 # ante
 
+[![CI](https://github.com/soudasuwa/ante/actions/workflows/ci.yml/badge.svg)](https://github.com/soudasuwa/ante/actions/workflows/ci.yml)
+
 A small, mandatory proof-of-work commitment for [Freenet](https://freenet.org)
 identities — the stepping stone between *no effort at all to sybil* and *needs a
 [ghost key](https://freenet.org/ghostkey)*.
