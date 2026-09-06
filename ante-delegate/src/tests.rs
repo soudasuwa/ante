@@ -362,3 +362,173 @@ fn plain_allow_does_not_create_a_grant() {
         [OutboundDelegateMsg::RequestUserInput(_)]
     ));
 }
+
+// ---------------------------------------------------------------------------
+// ExportIdentity / ImportIdentity — backup & recovery
+// ---------------------------------------------------------------------------
+
+/// request_id of a two-button (backup / recovery) prompt.
+fn recovery_prompt_id(out: &[OutboundDelegateMsg]) -> u32 {
+    let [OutboundDelegateMsg::RequestUserInput(req)] = out else {
+        panic!("expected one RequestUserInput, got {out:?}");
+    };
+    assert_eq!(req.responses.len(), 2, "action / cancel");
+    req.request_id
+}
+
+#[test]
+fn export_prompts_then_reveals_the_seed() {
+    let mut env = env();
+    let id = recovery_prompt_id(&run(&mut env, &origin_a(), AnteRequest::ExportIdentity));
+
+    let out = consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Reveal"))
+        .expect("handled");
+    assert_eq!(
+        decode_reply(&out),
+        AnteResponse::IdentitySeed { seed: ENTROPY }
+    );
+    assert!(env.context_is_empty());
+}
+
+#[test]
+fn export_cancelled_reveals_nothing() {
+    let mut env = env();
+    let id = recovery_prompt_id(&run(&mut env, &origin_a(), AnteRequest::ExportIdentity));
+    let out = consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Cancel"))
+        .expect("handled");
+    assert_eq!(decode_reply(&out), AnteResponse::Denied);
+
+    // The seed must not appear anywhere in the outbound bytes.
+    let OutboundDelegateMsg::ApplicationMessage(app) = &out[0] else {
+        panic!()
+    };
+    assert!(!app.payload.windows(ENTROPY.len()).any(|w| w == ENTROPY));
+}
+
+#[test]
+fn export_ignores_a_commit_button() {
+    let mut env = env();
+    let id = recovery_prompt_id(&run(&mut env, &origin_a(), AnteRequest::ExportIdentity));
+    // "Allow" is the commit vocabulary — not an approval for an export.
+    let out = consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Allow"))
+        .expect("handled");
+    assert_eq!(decode_reply(&out), AnteResponse::Denied);
+}
+
+const IMPORT_SEED: [u8; 32] = [0x55; 32];
+
+fn import_req(seed: &[u8]) -> AnteRequest {
+    AnteRequest::ImportIdentity {
+        seed: seed.to_vec(),
+    }
+}
+
+#[test]
+fn import_into_a_fresh_delegate_sets_the_identity() {
+    let mut env = TestEnv::new(); // no identity yet
+    let id = recovery_prompt_id(&run(&mut env, &origin_a(), import_req(&IMPORT_SEED)));
+    let out = consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Import"))
+        .expect("handled");
+
+    let imported_vk = SigningKey::from_bytes(&IMPORT_SEED)
+        .verifying_key()
+        .to_bytes();
+    assert_eq!(
+        decode_reply(&out),
+        AnteResponse::Imported {
+            verifying_key: imported_vk
+        }
+    );
+    // GetIdentity now reports the imported key.
+    assert_eq!(
+        decode_reply(&run(&mut env, &origin_a(), AnteRequest::GetIdentity)),
+        AnteResponse::Identity {
+            verifying_key: imported_vk
+        }
+    );
+}
+
+#[test]
+fn import_over_an_existing_identity_replaces_it_and_clears_grants() {
+    let mut env = env();
+    // Establish identity A and an "always allow" grant for origin_a.
+    let gid = prompt_request_id(&run(&mut env, &origin_a(), commit_req(good_nonce(), BITS)));
+    consent::handle_response(&mut env, Some(&origin_a()), &answer(gid, b"Always allow")).unwrap();
+
+    let id = recovery_prompt_id(&run(&mut env, &origin_a(), import_req(&IMPORT_SEED)));
+    consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Import")).unwrap();
+
+    let imported_vk = SigningKey::from_bytes(&IMPORT_SEED)
+        .verifying_key()
+        .to_bytes();
+    assert_eq!(
+        decode_reply(&run(&mut env, &origin_a(), AnteRequest::GetIdentity)),
+        AnteResponse::Identity {
+            verifying_key: imported_vk
+        }
+    );
+    // The old identity's grant is gone — a commit prompts again. (The nonce
+    // has to clear the bar for the *new* identity.)
+    let nonce = pow::grind(PURPOSE, &imported_vk, BITS).expect("reachable");
+    let out = dispatch(&mut env, Some(&origin_a()), commit_req(nonce, BITS)).unwrap();
+    assert!(matches!(
+        out.as_slice(),
+        [OutboundDelegateMsg::RequestUserInput(_)]
+    ));
+}
+
+#[test]
+fn re_importing_the_current_identity_is_a_silent_noop() {
+    let mut env = env(); // identity is SigningKey::from_bytes(ENTROPY)
+    run(&mut env, &origin_a(), AnteRequest::GetIdentity); // materialise it
+    let out = run(&mut env, &origin_a(), import_req(&ENTROPY));
+    assert_eq!(
+        decode_reply(&out),
+        AnteResponse::Imported {
+            verifying_key: expected_key().verifying_key().to_bytes()
+        }
+    );
+    assert!(
+        !matches!(out.as_slice(), [OutboundDelegateMsg::RequestUserInput(_)]),
+        "no prompt for a no-op re-import"
+    );
+}
+
+#[test]
+fn import_rejects_a_wrong_length_seed() {
+    let mut env = env();
+    let out = run(&mut env, &origin_a(), import_req(&[1u8; 31]));
+    assert!(matches!(decode_reply(&out), AnteResponse::Error { .. }));
+    assert!(env.context_is_empty(), "a bad seed parks nothing");
+}
+
+#[test]
+fn an_exported_seed_round_trips_into_another_delegate() {
+    // Export from one delegate...
+    let mut source = env();
+    let id = recovery_prompt_id(&run(&mut source, &origin_a(), AnteRequest::ExportIdentity));
+    let AnteResponse::IdentitySeed { seed } = decode_reply(
+        &consent::handle_response(&mut source, Some(&origin_a()), &answer(id, b"Reveal")).unwrap(),
+    ) else {
+        panic!("expected IdentitySeed");
+    };
+
+    // ...import it into a fresh one.
+    let mut dest = TestEnv::new();
+    let id = recovery_prompt_id(&run(&mut dest, &origin_a(), import_req(&seed)));
+    consent::handle_response(&mut dest, Some(&origin_a()), &answer(id, b"Import")).unwrap();
+
+    assert_eq!(
+        decode_reply(&run(&mut dest, &origin_a(), AnteRequest::GetIdentity)),
+        decode_reply(&run(&mut source, &origin_a(), AnteRequest::GetIdentity)),
+    );
+}
+
+#[test]
+fn an_import_answer_from_another_app_is_refused() {
+    let mut env = env();
+    let id = recovery_prompt_id(&run(&mut env, &origin_a(), import_req(&IMPORT_SEED)));
+    let err = consent::handle_response(&mut env, Some(&origin_b()), &answer(id, b"Import"));
+    assert!(err.is_err());
+    assert!(!env.context_is_empty(), "the real prompt must survive");
+}

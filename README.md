@@ -21,12 +21,13 @@ Verifying is one blake3 hash and one signature check.
 ```
 ante-core/      the primitive + AnteProof + verify + the registry CRDT
                 (no freenet-stdlib dependency — a verifier links only this)
-ante-delegate/  the Freenet delegate: key custody + consent prompt + signing (→ WASM)
+ante-delegate/  the Freenet delegate: key custody + consent prompt + signing +
+                seed export/import for backup (→ WASM)
 contracts/
   ante-registry/        records each identity's best identity-level proof (→ WASM)
 client/         @ante/client — the delegate embedded + a 2-line API an app calls
                 (AnteClient.attach → ante.commit(purpose)); the TS PoW + verifier
-web/            identity-management UI: create an identity, grind bits, hold proofs
+web/            identity-management UI: create an identity, grind bits, back it up
 tools/          delegate-key: compute a delegate's address from its WASM
 scripts/        build-delegate.sh, sync-delegate.sh, build-contract.sh
 examples/
@@ -36,7 +37,9 @@ examples/
 ## Status
 
 **Phase 1** (works end to end) — the delegate, the primitive, and the UI. An
-app gets an `AnteProof` per action, ground on demand.
+app gets an `AnteProof` per action, ground on demand. The identity has a
+recovery code (`ExportIdentity` / `ImportIdentity`), so it survives a node
+whose secret store is wiped.
 
 **Phase 2** (contract done; UI wiring + publish pending) — `ante-core::registry`
 and `contracts/ante-registry/`: an identity publishes its level once, and an

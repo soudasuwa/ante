@@ -16,10 +16,15 @@
 //! | `GetIdentity` | no | the identity verifying key (created on first use) |
 //! | `Challenge { purpose }` | no | the exact bytes to grind |
 //! | `Commit { purpose, nonce, min_bits, ts }` | **yes** | a signed `AnteProof`, or `Denied` |
+//! | `ListGrants` / `RevokeGrant` | no | the "always allow" origins / `Revoked` |
+//! | `ExportIdentity` | **yes** | the 32-byte secret seed, or `Denied` |
+//! | `ImportIdentity { seed }` | **yes** | `Imported { verifying_key }`, or `Denied` |
 //!
 //! `Commit` first checks the nonce against `min_bits` (so the user is never
 //! asked to approve a dud), then raises the prompt. On approval it signs; the
-//! answer arrives on a later `process()` call as a `UserResponse`.
+//! answer arrives on a later `process()` call as a `UserResponse`. Export and
+//! import use the same round-trip — they are the only way the secret seed
+//! leaves or enters the delegate, and both always prompt.
 
 mod consent;
 mod env;
@@ -126,7 +131,32 @@ fn dispatch(
                     &key, purpose, nonce, ts,
                 ))]);
             }
-            consent::emit_prompt(env, origin, &vk, &purpose, nonce, achieved, ts)
+            consent::emit_commit_prompt(env, origin, &vk, &purpose, nonce, achieved, ts)
+        }
+
+        AnteRequest::ExportIdentity => {
+            let key = match identity::load_or_create(env) {
+                Ok(k) => k,
+                Err(message) => return Ok(vec![reply(&AnteResponse::Error { message })]),
+            };
+            consent::emit_export_prompt(env, origin, &key.verifying_key().to_bytes())
+        }
+
+        AnteRequest::ImportIdentity { seed } => {
+            let Ok(seed) = <[u8; 32]>::try_from(seed.as_slice()) else {
+                return Ok(vec![reply(&AnteResponse::Error {
+                    message: format!("identity seed must be 32 bytes, got {}", seed.len()),
+                })]);
+            };
+            let new_vk = identity::vk_for_seed(&seed);
+            let replacing = identity::load_existing(env).map(|k| k.verifying_key().to_bytes());
+            // Re-importing the identity you already have is a no-op.
+            if replacing == Some(new_vk) {
+                return Ok(vec![reply(&AnteResponse::Imported {
+                    verifying_key: new_vk,
+                })]);
+            }
+            consent::emit_import_prompt(env, origin, &new_vk, replacing, seed)
         }
     }
 }

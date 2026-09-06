@@ -196,6 +196,28 @@ dd.wrap {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+.muted.err {
+  color: var(--err);
+}
+
+/* backup & restore */
+#recovery-restore {
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+#recovery-restore summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+#recovery-restore[open] summary {
+  margin-bottom: 0.5rem;
+}
+#recovery-code {
+  color: var(--fg);
+  font-size: 0.82rem;
+}
 .result {
   margin-top: 0.75rem;
   padding: 0.6rem 0.75rem;

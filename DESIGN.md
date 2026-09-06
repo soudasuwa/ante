@@ -41,9 +41,10 @@ consumer that cares about hardware-era drift applies its own discount.
 
 | Crate / dir | Role |
 |---|---|
-| `ante-core` | The primitive + `AnteProof` + `verify`. No `freenet-stdlib` dep — a contract that only verifies links just this. |
-| `ante-delegate` | Freenet delegate. Custodies one Ed25519 identity per calling origin, signs proofs behind a user consent prompt. Compiles to WASM. |
-| `web/` | Identity-management UI: create an identity, grind bits, hold proofs, manage per-app permissions. |
+| `ante-core` | The primitive + `AnteProof` + `verify` + the registry CRDT. No `freenet-stdlib` dep — a contract that only verifies links just this. |
+| `ante-delegate` | Freenet delegate. Custodies **one shared** Ed25519 identity, signs proofs behind a user consent prompt, and exports / imports the seed for backup. Compiles to WASM. |
+| `client/` | `@ante/client` — the delegate embedded, a 2-line producer API, the TS PoW + verifier, the recovery-code codec. |
+| `web/` | Identity-management UI: create an identity, grind bits, back it up, manage per-app permissions. |
 
 ## The two flows
 
@@ -51,7 +52,8 @@ Both use one mechanism: **prompt → grind → sign**.
 
 ### Per-action (an app asks)
 
-1. App → delegate `GetIdentity` → learns the user's verifying key for its origin.
+1. App → delegate `GetIdentity` → learns the user's verifying key (one shared
+   key; every app sees the same one, which is what makes a level portable).
 2. App → delegate `Challenge { purpose }` → gets the exact bytes to grind.
 3. App grinds a nonce in a Web Worker.
 4. App → delegate `Commit { purpose, nonce, min_bits, ts }`.
@@ -72,33 +74,51 @@ read a level without triggering a fresh grind.
 
 ## Consent round-trip mechanics
 
-`Commit` can't be answered in one `process()` call. The delegate:
+`Commit`, `ExportIdentity`, and `ImportIdentity` can't be answered in one
+`process()` call. The delegate:
 
-1. writes `PendingCommit { request_id, origin_ns, purpose, nonce, ts }` to its
-   scratch context (host-held, ~10 min TTL, keyed by delegate),
-2. emits `RequestUserInput { request_id, message, responses: [Allow, Deny] }`.
+1. writes `Pending { request_id, origin_tag, action }` to its scratch context
+   (host-held, ~10 min TTL, keyed by delegate) — `action` is `Commit { purpose,
+   nonce, ts }`, `Export`, or `Import { seed, replacing }`,
+2. emits `RequestUserInput { request_id, message, responses }` — `[Allow,
+   Always allow, Deny]` for a commit, `[Reveal, Cancel]` / `[Import, Cancel]`
+   for backup / recovery.
 
 The user's click returns as `InboundDelegateMsg::UserResponse` on a later
 `process()`. The delegate then checks:
 
 - `request_id` matches the parked prompt (**which** question) — a mismatch
   leaves the prompt standing, it does not clear it,
-- the answering origin matches `origin_ns` (**whose** question) — the runtime
+- the answering origin matches `origin_tag` (**whose** question) — the runtime
   feeds a genuine answer back through the same attested origin,
 
-clears the context, and signs (or returns `Denied`).
+clears the context, and performs the action (or returns `Denied`).
 
 ## Key custody
 
-One Ed25519 seed per calling origin, in the node's encrypted secret store,
-namespaced `ante:identity:v1:webapp:<contract-id>` /
-`ante:identity:v1:delegate:<key>`. The private key never leaves the delegate;
-callers see only the verifying key and finished proofs. Generated from host
-entropy on first use; an all-zero seed (entropy failure) is refused.
+**One** Ed25519 seed for the whole delegate, at `ante:identity:v1:primary` in
+the node's encrypted secret store — every calling app shares it, so a level
+published to the registry is portable. Generated from host entropy on first
+use; an all-zero seed (entropy failure) is refused.
+
+The private key normally never leaves the delegate — callers see only the
+verifying key and finished proofs. The one exception is `ExportIdentity`:
+behind its own prompt it returns the raw seed so the user can save a recovery
+code (`ante-` + base58(seed ‖ blake3(seed)[:4])). `ImportIdentity` is the
+inverse — it restores the seed on a new node or after the secret store is lost,
+and clears the replaced identity's "always allow" grants. An exportable key is
+a phishable key; for a low-stakes PoW identity that trade beats losing the
+accumulated level to a node wipe.
+
+## "Always allow" grants
+
+The first `Commit` from an app prompts with a third button, **Always allow**.
+Choosing it records the attested `origin_tag` in `ante:grants:v1`; subsequent
+commits from that origin sign without a prompt until the user revokes the grant
+from the UI. `Allow` signs once and records nothing.
 
 ## Non-goals
 
-- No "always allow" grant — every `Commit` prompts. (Could change.)
 - No freshness / epoch binding on the PoW. A consumer that needs it folds a
   recent marker into its `purpose` string.
 - No defense against a resourced adversary. By design.
@@ -111,14 +131,18 @@ a bug fix, a dependency bump — produces a new key and strands what was stored
 under the old one: every user's identity seed (delegate) and every published
 level (registry).
 
-The committed per-crate `Cargo.lock` prevents *accidental* re-keys. A
-*deliberate* upgrade needs [`freenet-migrate`](https://github.com/freenet/freenet-migrate)
-(the same tool ghostkeys uses for its delegate secrets). When cutting v0.2:
+The committed per-crate `Cargo.lock` prevents *accidental* re-keys. For the
+delegate, `ExportIdentity` / `ImportIdentity` already give the user a manual
+path across a re-key: save the recovery code before upgrading, restore it
+after. A *deliberate*, hands-off upgrade would still want
+[`freenet-migrate`](https://github.com/freenet/freenet-migrate) (the tool
+ghostkeys uses). When cutting v0.2:
 
 1. Record the current WASM `code_hash`es in a `legacy.toml` per crate.
 2. Registry: impl `freenet_scaffold::ComposableState` for `RegistryState`
    (the hand-rolled `merge` already satisfies the semantics) so
    `carry_forward` can fold old state through the contract's own validator.
-3. Delegate: add a `SecretTransport` impl to export/import the identity seeds.
+3. Delegate: wire the seed export/import into a `SecretTransport` impl so the
+   carry-forward is automatic, not a copy-paste.
 
 Not done now — v0.1 has one user and no successor.

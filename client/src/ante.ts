@@ -22,25 +22,33 @@ import type { FreenetClient } from "./freenet";
 import PowWorker from "./pow-worker?worker&inline";
 import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
 
-/// The node holds a `Commit` request open while the consent prompt is on
-/// screen — up to exactly 60 s (`USER_INPUT_TIMEOUT` in freenet-core), then
-/// auto-denies. Wait a little past that.
-const COMMIT_TIMEOUT_MS = 75_000;
+/// The node holds a prompting request (`Commit`, `ExportIdentity`,
+/// `ImportIdentity`) open while the consent prompt is on screen — up to exactly
+/// 60 s (`USER_INPUT_TIMEOUT` in freenet-core), then auto-denies. Wait past that.
+const PROMPT_TIMEOUT_MS = 75_000;
 
 export type CommitOutcome =
   | { kind: "committed"; proof: AnteProof; bytes: Uint8Array }
   | { kind: "denied" };
 
-export interface CommitOptions {
+export type ExportOutcome = { kind: "exported"; seed: Uint8Array } | { kind: "denied" };
+
+export type ImportOutcome =
+  | { kind: "imported"; verifyingKey: Uint8Array }
+  | { kind: "denied" };
+
+/// Options for a request that raises a consent prompt on the node.
+export interface PromptOptions {
+  /// Called just before the request goes to the node; the prompt appears there
+  /// a moment later. There is no signal for the prompt itself.
+  onPrompt?: () => void;
+}
+
+export interface CommitOptions extends PromptOptions {
   /// Minimum leading-zero bits to grind for. Default 18.
   minBits?: number;
   /// Called with (hashesTried, hashesPerSecond) during the grind.
   onProgress?: (tried: number, hps: number) => void;
-  /// Called just before the commit goes to the node; the consent prompt
-  /// appears there a moment later. There is no signal for the prompt itself —
-  /// the node holds the request open and sends one response after the user
-  /// answers.
-  onPrompt?: () => void;
 }
 
 export class AnteClient {
@@ -96,24 +104,37 @@ export class AnteClient {
     minBits: number,
     onPrompt?: () => void,
   ): Promise<CommitOutcome> {
-    const request: CborValue = { Commit: { purpose, nonce, min_bits: minBits, ts: Date.now() } };
-    onPrompt?.();
-    const reply = await sendToDelegate(
-      this.client,
-      this.delegate,
-      cborEncode(request),
-      COMMIT_TIMEOUT_MS,
+    const reply = await this.prompted(
+      { Commit: { purpose, nonce, min_bits: minBits, ts: Date.now() } },
+      onPrompt,
     );
-    if (reply.payloads.length === 0) throw new Error("no response from the delegate for the commit");
-
-    const parsed = enumVariant(cborDecode(reply.payloads[0]));
-    if (parsed.variant === "Denied") return { kind: "denied" };
-    if (parsed.variant === "Error") {
-      throw new Error(`ante delegate: ${asString(mapGet(parsed.fields!, "message"))}`);
-    }
-    expect(parsed.variant, "Committed");
-    const bytes = asBytes(mapGet(parsed.fields!, "proof"));
+    if (reply.denied) return { kind: "denied" };
+    expect(reply.variant, "Committed");
+    const bytes = asBytes(mapGet(reply.fields!, "proof"));
     return { kind: "committed", proof: decodeAnteProof(bytes), bytes };
+  }
+
+  /// Reveal the identity's 32-byte secret seed, for the user to back up.
+  /// Raises a consent prompt — `outcome.kind === "denied"` if the user
+  /// cancels. Pass `outcome.seed` to `identityCodeFromSeed` for a recovery
+  /// code, or store the bytes directly. Handle the result carefully: it is the
+  /// private key.
+  async exportIdentity(opts: PromptOptions = {}): Promise<ExportOutcome> {
+    const reply = await this.prompted("ExportIdentity", opts.onPrompt);
+    if (reply.denied) return { kind: "denied" };
+    expect(reply.variant, "IdentitySeed");
+    return { kind: "exported", seed: asBytes(mapGet(reply.fields!, "seed")) };
+  }
+
+  /// Set this device's identity to `seed` (32 bytes) — restoring a backup.
+  /// Raises a consent prompt; if an identity already exists the prompt warns it
+  /// will be replaced. Re-importing the current seed resolves without a prompt.
+  async importIdentity(seed: Uint8Array, opts: PromptOptions = {}): Promise<ImportOutcome> {
+    if (seed.length !== 32) throw new Error("identity seed must be 32 bytes");
+    const reply = await this.prompted({ ImportIdentity: { seed: Array.from(seed) } }, opts.onPrompt);
+    if (reply.denied) return { kind: "denied" };
+    expect(reply.variant, "Imported");
+    return { kind: "imported", verifyingKey: asBytes(mapGet(reply.fields!, "verifying_key")) };
   }
 
   /// Origins that hold an "always allow" grant. For a managing UI.
@@ -139,6 +160,30 @@ export class AnteClient {
       throw new Error(`ante delegate: ${asString(mapGet(parsed.fields!, "message"))}`);
     }
     return parsed;
+  }
+
+  /// A request that raises a consent prompt: fire `onPrompt`, send with the
+  /// long timeout, and fold `Denied` / `Error` into a single shape.
+  private async prompted(
+    request: CborValue,
+    onPrompt: (() => void) | undefined,
+  ): Promise<
+    { denied: true } | { denied: false; variant: string; fields: CborValue | null }
+  > {
+    onPrompt?.();
+    const reply = await sendToDelegate(
+      this.client,
+      this.delegate,
+      cborEncode(request),
+      PROMPT_TIMEOUT_MS,
+    );
+    if (reply.payloads.length === 0) throw new Error("no response from the delegate");
+    const parsed = enumVariant(cborDecode(reply.payloads[0]));
+    if (parsed.variant === "Denied") return { denied: true };
+    if (parsed.variant === "Error") {
+      throw new Error(`ante delegate: ${asString(mapGet(parsed.fields!, "message"))}`);
+    }
+    return { denied: false, variant: parsed.variant, fields: parsed.fields };
   }
 }
 

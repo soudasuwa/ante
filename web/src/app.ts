@@ -9,6 +9,9 @@ import {
   decodeAnteProof,
   fingerprint,
   FreenetClient,
+  identityCodeFromSeed,
+  identityFingerprintFromCode,
+  identitySeedFromCode,
   IDENTITY_LEVEL_PURPOSE,
   RegistryClient,
   registryConfigured,
@@ -45,10 +48,9 @@ async function boot() {
     ante = await AnteClient.attach(fn);
     if (registryConfigured()) registry = new RegistryClient(fn);
 
-    identityVk = await ante.identity();
-    $("id-fingerprint").textContent = fingerprint(identityVk);
-    $("id-vk").textContent = bytesToHex(identityVk);
+    showIdentity(await ante.identity());
     $("identity-panel").hidden = false;
+    $("recovery-panel").hidden = false;
     $("action-panel").hidden = false;
 
     setConn(registry ? "ready" : "ready — no registry configured, level not tracked", "ok");
@@ -56,6 +58,99 @@ async function boot() {
     void refreshGrants();
   } catch (err) {
     setConn(`could not reach the delegate: ${(err as Error).message}`, "err");
+  }
+}
+
+function showIdentity(vk: Uint8Array) {
+  identityVk = vk;
+  $("id-fingerprint").textContent = fingerprint(vk);
+  $("id-vk").textContent = bytesToHex(vk);
+}
+
+// --------------------------------------------------------------------------
+// backup & restore
+// --------------------------------------------------------------------------
+
+async function revealRecovery() {
+  if (!ante) return;
+  const btn = $("recovery-reveal") as HTMLButtonElement;
+  const progress = $("recovery-progress");
+  btn.disabled = true;
+  progress.hidden = false;
+  progress.textContent = "approve the prompt on your node…";
+  try {
+    const outcome = await ante.exportIdentity({
+      onPrompt: () => (progress.textContent = "approve the prompt on your node (you have 60 s)…"),
+    });
+    if (outcome.kind === "denied") {
+      progress.textContent = "cancelled — nothing was revealed";
+      return;
+    }
+    $("recovery-code").textContent = identityCodeFromSeed(outcome.seed);
+    $("recovery-out").hidden = false;
+    progress.hidden = true;
+  } catch (err) {
+    progress.textContent = `failed: ${(err as Error).message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function previewRestore() {
+  const raw = ($("restore-input") as HTMLTextAreaElement).value.trim();
+  const preview = $("restore-preview");
+  if (!raw) {
+    preview.textContent = "";
+    return;
+  }
+  try {
+    preview.textContent = `Restores identity ${identityFingerprintFromCode(raw)}.`;
+    preview.className = "muted";
+  } catch (err) {
+    preview.textContent = (err as Error).message;
+    preview.className = "muted err";
+  }
+}
+
+async function runRestore() {
+  if (!ante) return;
+  const btn = $("restore-go") as HTMLButtonElement;
+  const progress = $("restore-progress");
+  const raw = ($("restore-input") as HTMLTextAreaElement).value.trim();
+
+  let seed: Uint8Array;
+  try {
+    seed = identitySeedFromCode(raw);
+  } catch (err) {
+    progress.hidden = false;
+    progress.textContent = (err as Error).message;
+    return;
+  }
+
+  btn.disabled = true;
+  progress.hidden = false;
+  progress.textContent = "approve the prompt on your node (you have 60 s)…";
+  try {
+    const outcome = await ante.importIdentity(seed, {
+      onPrompt: () => (progress.textContent = "approve the prompt on your node (you have 60 s)…"),
+    });
+    if (outcome.kind === "denied") {
+      progress.textContent = "cancelled — your identity is unchanged";
+      return;
+    }
+    showIdentity(outcome.verifyingKey);
+    currentLevel = null;
+    ($("restore-input") as HTMLTextAreaElement).value = "";
+    $("restore-preview").textContent = "";
+    $("recovery-out").hidden = true;
+    ($("recovery-restore") as HTMLDetailsElement).open = false;
+    progress.textContent = `restored — this device is now identity ${fingerprint(outcome.verifyingKey)}`;
+    await refreshLevel();
+    void refreshGrants();
+  } catch (err) {
+    progress.textContent = `failed: ${(err as Error).message}`;
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -265,6 +360,9 @@ function runVerify() {
 function wireStaticHandlers() {
   ($("improve-bits") as HTMLInputElement).addEventListener("input", updateImproveLabel);
   $("improve-go").addEventListener("click", () => void runImprove());
+  $("recovery-reveal").addEventListener("click", () => void revealRecovery());
+  ($("restore-input") as HTMLTextAreaElement).addEventListener("input", previewRestore);
+  $("restore-go").addEventListener("click", () => void runRestore());
   $("action-go").addEventListener("click", () => void runAction());
   $("verify-go").addEventListener("click", runVerify);
 

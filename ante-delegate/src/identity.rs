@@ -70,6 +70,27 @@ pub fn load_or_create(env: &mut impl DelegateEnv) -> Result<SigningKey, String> 
 
 /// Load the identity key **without** creating one. `None` if none exists yet.
 pub fn load_existing(env: &impl DelegateEnv) -> Option<SigningKey> {
-    let seed: [u8; 32] = env.get_secret(IDENTITY_SEED_KEY)?.try_into().ok()?;
-    Some(SigningKey::from_bytes(&seed))
+    Some(SigningKey::from_bytes(&export_seed(env)?))
+}
+
+/// The raw 32-byte identity seed, for the user to back up. `None` if none
+/// exists yet. Only ever reached through the `ExportIdentity` consent prompt.
+pub fn export_seed(env: &impl DelegateEnv) -> Option<[u8; 32]> {
+    env.get_secret(IDENTITY_SEED_KEY)?.try_into().ok()
+}
+
+/// Replace the stored identity seed with `seed` (restoring a backup). Only
+/// reached through the `ImportIdentity` consent prompt.
+pub fn import_seed(env: &mut impl DelegateEnv, seed: &[u8; 32]) -> Result<(), String> {
+    if env.set_secret(IDENTITY_SEED_KEY, seed) {
+        Ok(())
+    } else {
+        Err("failed to persist the imported identity".to_string())
+    }
+}
+
+/// The verifying key a seed produces — for showing which identity an import
+/// would switch to, before it happens.
+pub fn vk_for_seed(seed: &[u8; 32]) -> [u8; 32] {
+    SigningKey::from_bytes(seed).verifying_key().to_bytes()
 }

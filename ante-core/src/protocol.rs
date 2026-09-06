@@ -13,6 +13,11 @@
 //! 3. grind a nonce off-thread (see the `pow` module / the JS worker).
 //! 4. [`AnteRequest::Commit`] — the delegate shows a consent prompt; on
 //!    approval it signs an [`AnteProof`] over the work and returns it.
+//!
+//! Backup / recovery: [`AnteRequest::ExportIdentity`] reveals the identity's
+//! 32-byte secret seed (behind a prompt — the one request that exposes the
+//! private key), and [`AnteRequest::ImportIdentity`] restores it on another
+//! device, or after the node's secret store is lost. Both always prompt.
 
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +59,18 @@ pub enum AnteRequest {
     /// Remove one "always allow" grant, or all of them when `origin` is
     /// `None`. Revoking a permission is safe, so no prompt.
     RevokeGrant { origin: Option<Vec<u8>> },
+
+    /// Reveal the identity's 32-byte secret seed so the user can back it up.
+    /// **Always prompts** — this is the only request that exposes the private
+    /// key. The delegate creates an identity first if none exists.
+    ExportIdentity,
+
+    /// Set this device's identity to `seed` (32 bytes) — restoring a backup on
+    /// a new device or after the node's secret store was wiped. **Always
+    /// prompts**; if an identity already exists the prompt says it will be
+    /// replaced (and its "always allow" grants are cleared). Re-importing the
+    /// current seed is a no-op.
+    ImportIdentity { seed: Vec<u8> },
 }
 
 /// Responses the ante delegate sends back.
@@ -70,7 +87,8 @@ pub enum AnteResponse {
     /// write or hand to a verifier.
     Committed { proof: Vec<u8> },
 
-    /// The user declined the [`AnteRequest::Commit`] prompt.
+    /// The user declined a consent prompt ([`AnteRequest::Commit`],
+    /// [`AnteRequest::ExportIdentity`], or [`AnteRequest::ImportIdentity`]).
     Denied,
 
     /// The calling origins that currently hold an "always allow" grant.
@@ -78,6 +96,15 @@ pub enum AnteResponse {
 
     /// A [`AnteRequest::RevokeGrant`] was applied.
     Revoked,
+
+    /// The identity's 32-byte secret seed, in response to
+    /// [`AnteRequest::ExportIdentity`]. Whoever holds this controls the
+    /// identity — the client shows it once, for the user to store safely.
+    IdentitySeed { seed: [u8; 32] },
+
+    /// [`AnteRequest::ImportIdentity`] succeeded; `verifying_key` is the
+    /// now-active identity.
+    Imported { verifying_key: [u8; 32] },
 
     /// The request could not be served (malformed payload, nonce below
     /// `min_bits`, purpose too long, entropy failure, ...).

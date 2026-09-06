@@ -23,11 +23,13 @@ pub fn handle_simple(key: &SigningKey, request: &AnteRequest) -> AnteResponse {
         }
 
         // Routed in lib.rs, not here.
-        AnteRequest::Commit { .. } | AnteRequest::ListGrants | AnteRequest::RevokeGrant { .. } => {
-            AnteResponse::Error {
-                message: "request is not a simple query".to_string(),
-            }
-        }
+        AnteRequest::Commit { .. }
+        | AnteRequest::ListGrants
+        | AnteRequest::RevokeGrant { .. }
+        | AnteRequest::ExportIdentity
+        | AnteRequest::ImportIdentity { .. } => AnteResponse::Error {
+            message: "request is not a simple query".to_string(),
+        },
     }
 }
 

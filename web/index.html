@@ -50,6 +50,37 @@
         <p id="improve-progress" class="progress" hidden></p>
       </section>
 
+      <section id="recovery-panel" hidden>
+        <h2>Back up this identity</h2>
+        <p class="muted">
+          Your identity is a key held by the ante delegate on your node. If that
+          node's storage is lost, it's gone — unless you saved this code. You
+          can restore it here, on this node or another.
+        </p>
+        <button id="recovery-reveal">Show recovery code</button>
+        <p id="recovery-progress" class="progress" hidden></p>
+        <div id="recovery-out" class="result-block" hidden>
+          <p class="muted">
+            <strong>Anyone with this code controls your identity.</strong> Store
+            it somewhere safe, like a password manager — never paste it into a
+            site you don't trust.
+          </p>
+          <code id="recovery-code" class="wrap-code"></code>
+          <button data-copy="recovery-code" class="ghost">copy</button>
+        </div>
+
+        <details id="recovery-restore">
+          <summary>Restore from a recovery code</summary>
+          <label>
+            Recovery code
+            <textarea id="restore-input" rows="2" placeholder="ante-…"></textarea>
+          </label>
+          <p id="restore-preview" class="muted"></p>
+          <button id="restore-go">Restore identity</button>
+          <p id="restore-progress" class="progress" hidden></p>
+        </details>
+      </section>
+
       <section id="action-panel" hidden>
         <h2>Commit for an action <span class="tag">what an app does</span></h2>
         <p class="muted">

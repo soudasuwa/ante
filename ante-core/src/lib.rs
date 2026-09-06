@@ -87,6 +87,10 @@ mod protocol_tests {
             AnteRequest::RevokeGrant {
                 origin: Some(vec![9, 9, 9]),
             },
+            AnteRequest::ExportIdentity,
+            AnteRequest::ImportIdentity {
+                seed: vec![0x2a; 32],
+            },
         ];
         for req in reqs {
             assert_eq!(from_cbor::<AnteRequest>(&to_cbor(&req)).unwrap(), req);
@@ -107,6 +111,10 @@ mod protocol_tests {
                 origins: vec![vec![1, 2], vec![3, 4]],
             },
             AnteResponse::Revoked,
+            AnteResponse::IdentitySeed { seed: [0x2a; 32] },
+            AnteResponse::Imported {
+                verifying_key: [8u8; 32],
+            },
             AnteResponse::Error {
                 message: "nope".into(),
             },

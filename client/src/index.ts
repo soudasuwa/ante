@@ -10,7 +10,19 @@
 // (In a contract, link the `ante-core` Rust crate instead.)
 
 export { FreenetClient, contractKeyFromId, type FreenetEvents } from "./freenet";
-export { AnteClient, type CommitOutcome, type CommitOptions } from "./ante";
+export {
+  AnteClient,
+  type CommitOutcome,
+  type CommitOptions,
+  type PromptOptions,
+  type ExportOutcome,
+  type ImportOutcome,
+} from "./ante";
+export {
+  identityCodeFromSeed,
+  identitySeedFromCode,
+  identityFingerprintFromCode,
+} from "./recovery";
 export { RegistryClient, registryConfigured, ANTE_REGISTRY_CONTRACT_ID } from "./registry";
 
 export {
@@ -39,4 +51,4 @@ export {
   asNumber,
   asString,
 } from "./cbor";
-export { bytesToHex, hexToBytes, bytesEqual, base58 } from "./util";
+export { bytesToHex, hexToBytes, bytesEqual, base58, base58decode } from "./util";
