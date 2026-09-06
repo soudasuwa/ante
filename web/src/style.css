@@ -248,6 +248,15 @@ ul.held li {
   padding: 0.25rem 0.6rem;
   font-size: 0.82rem;
 }
+.grant-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.grant-row button {
+  margin-top: 0;
+}
 footer {
   margin-top: 2rem;
 }

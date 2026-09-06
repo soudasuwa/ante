@@ -37,12 +37,23 @@ pub enum AnteRequest {
     /// it *before* prompting, so the user is never asked to approve a dud.
     /// `ts` is the producer timestamp to embed (milliseconds since the Unix
     /// epoch); the client supplies it because the delegate has no clock.
+    ///
+    /// The first `Commit` from an app prompts (Allow / Always allow / Deny).
+    /// After "Always allow", `Commit`s from that app sign without a prompt.
     Commit {
         purpose: String,
         nonce: u64,
         min_bits: u32,
         ts: u64,
     },
+
+    /// List the calling origins that hold an "always allow" grant, for a
+    /// managing UI. No prompt.
+    ListGrants,
+
+    /// Remove one "always allow" grant, or all of them when `origin` is
+    /// `None`. Revoking a permission is safe, so no prompt.
+    RevokeGrant { origin: Option<Vec<u8>> },
 }
 
 /// Responses the ante delegate sends back.
@@ -61,6 +72,12 @@ pub enum AnteResponse {
 
     /// The user declined the [`AnteRequest::Commit`] prompt.
     Denied,
+
+    /// The calling origins that currently hold an "always allow" grant.
+    Grants { origins: Vec<Vec<u8>> },
+
+    /// A [`AnteRequest::RevokeGrant`] was applied.
+    Revoked,
 
     /// The request could not be served (malformed payload, nonce below
     /// `min_bits`, purpose too long, entropy failure, ...).

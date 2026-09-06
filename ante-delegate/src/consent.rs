@@ -16,10 +16,19 @@ use serde::{Deserialize, Serialize};
 use ante_core::{proof::AnteProof, to_cbor, AnteResponse};
 
 use crate::env::DelegateEnv;
-use crate::{identity, reply};
+use crate::{grants, identity, reply};
 
 const ALLOW: &[u8] = b"Allow";
+const ALWAYS: &[u8] = b"Always allow";
 const DENY: &[u8] = b"Deny";
+
+/// Build a signed `Committed` response. Shared by the prompt path and the
+/// "already granted" fast path in `lib.rs`.
+pub fn signed_commit(key: &SigningKey, purpose: String, nonce: u64, ts: u64) -> AnteResponse {
+    AnteResponse::Committed {
+        proof: to_cbor(&AnteProof::create(key, purpose, nonce, ts)),
+    }
+}
 
 /// State parked in the scratch context while a commit prompt is on screen.
 #[derive(Serialize, Deserialize)]
@@ -72,9 +81,8 @@ pub fn emit_prompt(
         "{caller} wants to spend proof of work on your ante identity {fingerprint}.\n\n\
          Purpose: {purpose}\n\
          This proof demonstrates {achieved_bits} bits of work.\n\n\
-         Approving signs a single one-off proof. Your key is never revealed, and \
-         nothing ongoing is granted.\n\n\
-         Allow, or deny?"
+         Allow signs one proof. Always allow also stops asking for this app \
+         until you revoke it. Your key is never revealed."
     );
 
     let pending = PendingCommit {
@@ -100,6 +108,7 @@ pub fn emit_prompt(
             },
             responses: vec![
                 freenet_stdlib::prelude::ClientResponse::new(ALLOW.to_vec()),
+                freenet_stdlib::prelude::ClientResponse::new(ALWAYS.to_vec()),
                 freenet_stdlib::prelude::ClientResponse::new(DENY.to_vec()),
             ],
         },
@@ -140,16 +149,23 @@ pub fn handle_response(
     // Right question, right caller: consume it.
     env.context_clear();
 
-    if resp.response.bytes() != ALLOW {
+    let answer = resp.response.bytes();
+    if answer != ALLOW && answer != ALWAYS {
         return Ok(vec![reply(&AnteResponse::Denied)]);
+    }
+
+    if answer == ALWAYS {
+        grants::grant(env, &pending.origin_tag).map_err(DelegateError::Other)?;
     }
 
     let key: SigningKey = identity::load_existing(env)
         .ok_or_else(|| DelegateError::Other("identity vanished mid-prompt".to_string()))?;
-    let proof = AnteProof::create(&key, pending.purpose, pending.nonce, pending.ts);
-    Ok(vec![reply(&AnteResponse::Committed {
-        proof: to_cbor(&proof),
-    })])
+    Ok(vec![reply(&signed_commit(
+        &key,
+        pending.purpose,
+        pending.nonce,
+        pending.ts,
+    ))])
 }
 
 /// A short label for the calling origin, for the prompt body. The

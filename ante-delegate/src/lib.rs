@@ -23,6 +23,7 @@
 
 mod consent;
 mod env;
+mod grants;
 mod handler;
 mod identity;
 
@@ -87,6 +88,17 @@ fn dispatch(
             }
         }
 
+        AnteRequest::ListGrants => Ok(vec![reply(&AnteResponse::Grants {
+            origins: grants::list(env),
+        })]),
+
+        AnteRequest::RevokeGrant { origin: tag } => {
+            Ok(vec![reply(&match grants::revoke(env, tag.as_deref()) {
+                Ok(()) => AnteResponse::Revoked,
+                Err(message) => AnteResponse::Error { message },
+            })])
+        }
+
         AnteRequest::Commit {
             purpose,
             nonce,
@@ -106,6 +118,13 @@ fn dispatch(
                 return Ok(vec![reply(&AnteResponse::Error {
                     message: format!("nonce demonstrates {achieved} bits, need {min_bits}"),
                 })]);
+            }
+
+            // A prior "Always allow" from this app signs without a prompt.
+            if grants::is_granted(env, &identity::origin_tag(origin)) {
+                return Ok(vec![reply(&consent::signed_commit(
+                    &key, purpose, nonce, ts,
+                ))]);
             }
             consent::emit_prompt(env, origin, &vk, &purpose, nonce, achieved, ts)
         }

@@ -22,9 +22,12 @@ pub fn handle_simple(key: &SigningKey, request: &AnteRequest) -> AnteResponse {
             }
         }
 
-        AnteRequest::Commit { .. } => AnteResponse::Error {
-            message: "Commit must go through the consent flow".to_string(),
-        },
+        // Routed in lib.rs, not here.
+        AnteRequest::Commit { .. } | AnteRequest::ListGrants | AnteRequest::RevokeGrant { .. } => {
+            AnteResponse::Error {
+                message: "request is not a simple query".to_string(),
+            }
+        }
     }
 }
 

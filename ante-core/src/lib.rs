@@ -82,6 +82,11 @@ mod protocol_tests {
                 min_bits: 20,
                 ts: 1_700_000_000_000,
             },
+            AnteRequest::ListGrants,
+            AnteRequest::RevokeGrant { origin: None },
+            AnteRequest::RevokeGrant {
+                origin: Some(vec![9, 9, 9]),
+            },
         ];
         for req in reqs {
             assert_eq!(from_cbor::<AnteRequest>(&to_cbor(&req)).unwrap(), req);
@@ -98,6 +103,10 @@ mod protocol_tests {
                 proof: vec![4, 5, 6],
             },
             AnteResponse::Denied,
+            AnteResponse::Grants {
+                origins: vec![vec![1, 2], vec![3, 4]],
+            },
+            AnteResponse::Revoked,
             AnteResponse::Error {
                 message: "nope".into(),
             },

@@ -36,6 +36,21 @@ export class AnteClient {
     return asBytes(mapGet(reply.fields!, "bytes"));
   }
 
+  /// Origins that hold an "always allow" grant. No prompt.
+  async listGrants(): Promise<Uint8Array[]> {
+    const reply = await this.oneShot("ListGrants");
+    expect(reply.variant, "Grants");
+    const origins = mapGet(reply.fields!, "origins");
+    return Array.isArray(origins) ? origins.map((o) => asBytes(o)) : [];
+  }
+
+  /// Remove one "always allow" grant, or all when `origin` is null. No prompt.
+  async revokeGrant(origin: Uint8Array | null): Promise<void> {
+    const req: CborValue = { RevokeGrant: { origin: origin ? Array.from(origin) : null } };
+    const reply = await this.oneShot(req);
+    expect(reply.variant, "Revoked");
+  }
+
   /// Ask the user to authorize spending the identity on `purpose`, and on
   /// approval get back a signed proof. The node shows the consent prompt in
   /// every open Freenet tab and holds this request open until the user answers

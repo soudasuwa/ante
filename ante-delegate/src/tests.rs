@@ -173,7 +173,7 @@ fn prompt_request_id(out: &[OutboundDelegateMsg]) -> u32 {
     let [OutboundDelegateMsg::RequestUserInput(req)] = out else {
         panic!("expected one RequestUserInput, got {out:?}");
     };
-    assert_eq!(req.responses.len(), 2, "Allow / Deny");
+    assert_eq!(req.responses.len(), 3, "Allow / Always allow / Deny");
     req.request_id
 }
 
@@ -290,4 +290,75 @@ fn a_higher_bar_than_committed_still_verifies_when_the_grind_cleared_it() {
     };
     let proof: AnteProof = ante_core::from_cbor(&proof).unwrap();
     assert!(proof.verify(BITS - 4).is_ok());
+}
+
+// ---------------------------------------------------------------------------
+// "Always allow" grants
+// ---------------------------------------------------------------------------
+
+#[test]
+fn always_allow_then_the_next_commit_signs_with_no_prompt() {
+    let mut env = env();
+
+    // First commit → prompt → "Always allow" → signs + records the grant.
+    let id = prompt_request_id(&run(&mut env, &origin_a(), commit_req(good_nonce(), BITS)));
+    let out = consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Always allow"))
+        .expect("handled");
+    assert!(matches!(decode_reply(&out), AnteResponse::Committed { .. }));
+
+    // Second commit from the same app → no RequestUserInput, straight Committed.
+    let out = run(&mut env, &origin_a(), commit_req(good_nonce(), BITS));
+    assert!(matches!(decode_reply(&out), AnteResponse::Committed { .. }));
+
+    // A different app still prompts.
+    let out = dispatch(&mut env, Some(&origin_b()), commit_req(good_nonce(), BITS)).unwrap();
+    assert!(matches!(
+        out.as_slice(),
+        [OutboundDelegateMsg::RequestUserInput(_)]
+    ));
+}
+
+#[test]
+fn list_and_revoke_grants() {
+    let mut env = env();
+    let id = prompt_request_id(&run(&mut env, &origin_a(), commit_req(good_nonce(), BITS)));
+    consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Always allow")).unwrap();
+
+    let AnteResponse::Grants { origins } =
+        decode_reply(&dispatch(&mut env, Some(&origin_a()), AnteRequest::ListGrants).unwrap())
+    else {
+        panic!("expected Grants");
+    };
+    assert_eq!(origins.len(), 1);
+
+    let revoked = dispatch(
+        &mut env,
+        Some(&origin_a()),
+        AnteRequest::RevokeGrant {
+            origin: Some(origins[0].clone()),
+        },
+    )
+    .unwrap();
+    assert_eq!(decode_reply(&revoked), AnteResponse::Revoked);
+
+    // Back to prompting.
+    let out = dispatch(&mut env, Some(&origin_a()), commit_req(good_nonce(), BITS)).unwrap();
+    assert!(matches!(
+        out.as_slice(),
+        [OutboundDelegateMsg::RequestUserInput(_)]
+    ));
+}
+
+#[test]
+fn plain_allow_does_not_create_a_grant() {
+    let mut env = env();
+    let id = prompt_request_id(&run(&mut env, &origin_a(), commit_req(good_nonce(), BITS)));
+    consent::handle_response(&mut env, Some(&origin_a()), &answer(id, b"Allow")).unwrap();
+
+    // Next commit still prompts.
+    let out = dispatch(&mut env, Some(&origin_a()), commit_req(good_nonce(), BITS)).unwrap();
+    assert!(matches!(
+        out.as_slice(),
+        [OutboundDelegateMsg::RequestUserInput(_)]
+    ));
 }

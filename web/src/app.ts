@@ -87,8 +87,56 @@ async function boot() {
 
     setConn(registry ? "ready" : "ready — no registry configured, level not tracked", "ok");
     await refreshLevel();
+    void refreshGrants();
   } catch (err) {
     setConn(`could not reach the delegate: ${(err as Error).message}`, "err");
+  }
+}
+
+// --------------------------------------------------------------------------
+// connected apps ("always allow" grants)
+// --------------------------------------------------------------------------
+
+const DEC = new TextDecoder();
+
+function grantLabel(tag: Uint8Array): string {
+  const s = DEC.decode(tag);
+  if (s.startsWith("webapp:")) return `app ${bytesToHex(tag.slice(7)).slice(0, 16)}…`;
+  if (s.startsWith("delegate:")) return `delegate ${bytesToHex(tag.slice(9)).slice(0, 16)}…`;
+  return s || "unknown";
+}
+
+async function refreshGrants() {
+  if (!ante) return;
+  let grants: Uint8Array[] = [];
+  try {
+    grants = await ante.listGrants();
+  } catch {
+    return;
+  }
+  const panel = $("grants-panel");
+  const list = $("grants-list");
+  panel.hidden = grants.length === 0;
+  list.innerHTML = "";
+  for (const tag of grants) {
+    const li = document.createElement("li");
+    li.className = "grant-row";
+    const name = document.createElement("code");
+    name.textContent = grantLabel(tag);
+    const revoke = document.createElement("button");
+    revoke.className = "ghost";
+    revoke.textContent = "revoke";
+    revoke.addEventListener("click", async () => {
+      revoke.disabled = true;
+      try {
+        await ante!.revokeGrant(tag);
+        await refreshGrants();
+      } catch (err) {
+        revoke.textContent = `failed: ${(err as Error).message}`;
+      }
+    });
+    li.append(name, revoke);
+    list.appendChild(li);
   }
 }
 
@@ -207,6 +255,7 @@ async function runImprove() {
       ? `done — your identity is at ${currentLevel} bits`
       : `signed ${bits} bits (no registry configured, so it isn't recorded)`;
     void refreshLevel();
+    void refreshGrants();
   } catch (err) {
     progress.textContent = `failed: ${(err as Error).message}`;
   } finally {
@@ -253,6 +302,7 @@ async function runAction() {
     progress.textContent = `signed — ${v.ok ? v.bits : target} bits for "${purpose}"`;
     ($("action-proof") as HTMLElement).textContent = bytesToHex(outcome.proofCbor);
     result.hidden = false;
+    void refreshGrants();
   } catch (err) {
     progress.textContent = `failed: ${(err as Error).message}`;
   } finally {
