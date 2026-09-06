@@ -48,11 +48,20 @@ match proof.verify(20) {
 ## Building
 
 ```bash
-cargo test                              # ante-core (workspace)
-cd ante-delegate && cargo test          # delegate logic, native
-./scripts/build-delegate.sh             # the delegate WASM (needs the wasm32 target)
-cd web && npm install && npm run dev     # the UI
+cargo test --workspace                   # ante-core + tools
+(cd ante-delegate && cargo test)         # delegate logic, native
+
+rustup target add wasm32-unknown-unknown # once
+./scripts/sync-delegate.sh               # build the delegate WASM -> web/.gen/
+
+cd web && npm install
+npm test                                 # cross-impl guard (TS verifier vs a Rust vector)
+npm run dev                              # the UI, against your local node
 ```
+
+`npm run dev` serves on its own origin, so pass your node with a query param:
+`http://localhost:5173/?node=127.0.0.1:7509`. Served through the node's gateway
+it needs no param.
 
 ## License
 
