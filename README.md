@@ -78,7 +78,7 @@ it needs no param.
 Optional — the UI works without it, showing only the local best level.
 
 ```bash
-cargo install --git https://github.com/freenet/freenet-core fdev   # once
+# fdev: install from https://freenet.org/install.sh  (cargo install fdev needs rustc >= 1.94)
 ./scripts/publish-registry.sh            # build, publish, write web/.gen/registry_contract_id.txt
 cd web && npm run build                  # or restart `npm run dev` to pick up the id
 ```
@@ -86,6 +86,20 @@ cd web && npm run build                  # or restart `npm run dev` to pick up t
 Once configured, the "Strengthen your identity" panel publishes each proof to
 the registry, and any app can read a level with
 `RegistryState::level(vk)` after a plain contract GET.
+
+### Publishing the UI to Freenet
+
+`fdev website` gives a permanent URL (derived from a signing key you keep):
+
+```bash
+fdev website init ante        # generates + prints the URL; BACK UP the key file
+./scripts/publish-web.sh       # build + publish; re-run to push updates
+```
+
+## Contributing & security
+
+Source and issues: <https://github.com/soudasuwa/ante>. Security vulnerabilities
+go through [private reporting](SECURITY.md), not public issues.
 
 ## License
 
