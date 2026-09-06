@@ -29,6 +29,10 @@ export default defineConfig({
     __ANTE_DELEGATE_KEY_BYTES__: genText("ante_delegate_key_bytes.json", "[]"),
     // blake3(raw wasm) — a different hash; both are needed to register.
     __ANTE_DELEGATE_CODE_HASH_BYTES__: genText("ante_delegate_code_hash_bytes.json", "[]"),
+    // The published ante-registry instance id (base58), from
+    // scripts/publish-registry.sh. Empty until the contract is published —
+    // the UI then shows only the local best level.
+    __ANTE_REGISTRY_CONTRACT_ID__: JSON.stringify(genText("registry_contract_id.txt", "")),
   },
   test: {
     environment: "node",

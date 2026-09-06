@@ -1,0 +1,11 @@
+[package]
+name = "registry-params"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Dev tool: emit the CBOR parameters blob for an ante-registry instance."
+
+[dependencies]
+ante-core = { workspace = true }
+ciborium = { workspace = true }

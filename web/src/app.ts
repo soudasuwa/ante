@@ -3,7 +3,12 @@
 import "./style.css";
 
 import { AnteClient, type CommitOutcome } from "./ante-client";
-import { decodeAnteProof, fingerprint, verifyAnteProof } from "./ante-proof";
+import {
+  decodeAnteProof,
+  fingerprint,
+  IDENTITY_LEVEL_PURPOSE,
+  verifyAnteProof,
+} from "./ante-proof";
 import { base64ToBytes, registerDelegate, type DelegateAddress } from "./delegate-api";
 import {
   ANTE_DELEGATE_CODE_HASH_BYTES,
@@ -13,6 +18,7 @@ import {
 } from "./delegate-wasm";
 import { FreenetClient } from "./freenet";
 import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
+import { RegistryClient, registryConfigured } from "./registry";
 import {
   forgetHeldProof,
   loadHeldProofs,
@@ -23,11 +29,10 @@ import {
 } from "./store";
 import { bytesToHex } from "./util";
 
-const IDENTITY_PURPOSE = "ante:identity-level:v1";
-
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 let ante: AnteClient | null = null;
+let registry: RegistryClient | null = null;
 let identityVk: Uint8Array | null = null;
 
 // --------------------------------------------------------------------------
@@ -78,12 +83,14 @@ async function boot() {
     ]);
     await registerDelegate(client, address, base64ToBytes(ANTE_DELEGATE_WASM_B64));
     ante = new AnteClient(client, address);
+    if (registryConfigured()) registry = new RegistryClient(client);
     identityVk = await ante.getIdentity();
     renderIdentity();
     for (const id of ["identity-panel", "strengthen-panel", "action-panel", "held-panel"]) {
       $(id).hidden = false;
     }
-    setConn("ready", "ok");
+    setConn(registry ? "ready" : "ready — registry not configured, local level only", "ok");
+    void refreshRegistryLevel();
   } catch (err) {
     setConn(`could not reach the delegate: ${(err as Error).message}`, "err");
   }
@@ -102,9 +109,24 @@ function renderIdentity() {
 
 function renderLevel() {
   const best = loadHeldProofs()
-    .filter((p) => p.purpose === IDENTITY_PURPOSE)
+    .filter((p) => p.purpose === IDENTITY_LEVEL_PURPOSE)
     .reduce((max, p) => Math.max(max, p.bits), 0);
   $("id-level").textContent = best > 0 ? `${best} bits` : "none yet";
+}
+
+async function refreshRegistryLevel() {
+  const el = $("id-registry-level");
+  if (!registry || !identityVk) {
+    el.textContent = registryConfigured() ? "—" : "not configured";
+    return;
+  }
+  el.textContent = "checking…";
+  try {
+    const bits = await registry.readLevel(identityVk);
+    el.textContent = bits === null ? "not published" : `${bits} bits`;
+  } catch (err) {
+    el.textContent = `lookup failed: ${(err as Error).message}`;
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -188,6 +210,20 @@ async function runGrindPanel(opts: {
     renderHeld();
     renderLevel();
     progress.textContent = `signed — ${held.bits} bits for ${opts.purpose}`;
+
+    // An identity-level proof also goes to the registry, if one is configured.
+    if (opts.purpose === IDENTITY_LEVEL_PURPOSE && registry) {
+      progress.textContent = `signed ${held.bits} bits — publishing to the registry…`;
+      try {
+        await registry.publishProof(outcome.proofCbor);
+        await refreshRegistryLevel();
+        progress.textContent = `published — ${held.bits} bits on the registry`;
+      } catch (err) {
+        progress.textContent = `signed ${held.bits} bits, but the registry publish failed: ${
+          (err as Error).message
+        }`;
+      }
+    }
   } catch (err) {
     progress.textContent = `failed: ${(err as Error).message}`;
   } finally {
@@ -272,7 +308,7 @@ function wireStaticHandlers() {
 
   $("strengthen-go").addEventListener("click", () =>
     runGrindPanel({
-      purpose: IDENTITY_PURPOSE,
+      purpose: IDENTITY_LEVEL_PURPOSE,
       targetBits: Number(sBits.value),
       progressId: "strengthen-progress",
       buttonId: "strengthen-go",

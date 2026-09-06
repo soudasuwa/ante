@@ -1,5 +1,5 @@
 [workspace]
-members = ["ante-core", "tools/delegate-key"]
+members = ["ante-core", "tools/delegate-key", "tools/registry-params"]
 # The delegate is deliberately excluded: it keeps its own Cargo.lock with
 # pinned dependency versions so a workspace `cargo update` cannot silently
 # change its WASM bytes. The delegate key is derived from those bytes

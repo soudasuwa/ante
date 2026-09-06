@@ -59,6 +59,7 @@ match proof.verify(20) {
 ```bash
 cargo test --workspace                   # ante-core + tools
 (cd ante-delegate && cargo test)         # delegate logic, native
+(cd contracts/ante-registry && cargo test)
 
 rustup target add wasm32-unknown-unknown # once
 ./scripts/sync-delegate.sh               # build the delegate WASM -> web/.gen/
@@ -71,6 +72,20 @@ npm run dev                              # the UI, against your local node
 `npm run dev` serves on its own origin, so pass your node with a query param:
 `http://localhost:5173/?node=127.0.0.1:7509`. Served through the node's gateway
 it needs no param.
+
+### Phase 2: the registry
+
+Optional — the UI works without it, showing only the local best level.
+
+```bash
+cargo install --git https://github.com/freenet/freenet-core fdev   # once
+./scripts/publish-registry.sh            # build, publish, write web/.gen/registry_contract_id.txt
+cd web && npm run build                  # or restart `npm run dev` to pick up the id
+```
+
+Once configured, the "Strengthen your identity" panel publishes each proof to
+the registry, and any app can read a level with
+`RegistryState::level(vk)` after a plain contract GET.
 
 ## License
 

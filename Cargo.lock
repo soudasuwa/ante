@@ -312,6 +312,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "registry-params"
+version = "0.1.0"
+dependencies = [
+ "ante-core",
+ "ciborium",
+]
+
+[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
