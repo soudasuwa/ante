@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  anteProofToCborValue,
   challengeBytes,
   decodeAnteProof,
   fingerprint,
   proofBits,
   verifyAnteProof,
 } from "../src/ante-proof";
+import { cborEncode } from "../src/cbor";
 import { grind, powBits } from "../src/pow";
 import { bytesToHex, hexToBytes } from "../src/util";
 
@@ -52,6 +54,10 @@ describe("verifyAnteProof matches ante-core::proof::verify", () => {
 
   it("grades to the achieved bits", () => {
     expect(proofBits(proof)).toBe(VECTOR.achievedBits);
+  });
+
+  it("re-encodes to the exact Rust CBOR (embed round-trips)", () => {
+    expect(bytesToHex(cborEncode(anteProofToCborValue(proof)))).toBe(VECTOR.proofCborHex);
   });
 
   it("verifies at and below the achieved bar", () => {

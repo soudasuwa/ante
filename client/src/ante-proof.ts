@@ -8,7 +8,7 @@
 import { blake3 } from "@noble/hashes/blake3.js";
 import { ed25519 } from "@noble/curves/ed25519.js";
 
-import { asBytes, asNumber, asString, cborDecode, mapGet } from "./cbor";
+import { asBytes, asNumber, asString, cborDecode, type CborValue, mapGet } from "./cbor";
 import { leadingZeroBits } from "./pow";
 import { base58, concatBytes, u32le, u64le } from "./util";
 
@@ -87,9 +87,14 @@ export function verifyAnteProof(proof: AnteProof, minBits: number): VerifyResult
 }
 
 /// Decode an `AnteProof` from the CBOR the delegate returns
-/// (`AnteResponse::Committed.proof`).
+/// (`AnteResponse::Committed.proof`, i.e. `commit()`'s `bytes`).
 export function decodeAnteProof(cbor: Uint8Array): AnteProof {
-  const value = cborDecode(cbor);
+  return decodeAnteProofValue(cborDecode(cbor));
+}
+
+/// Decode an `AnteProof` already sitting inside a larger decoded CBOR value —
+/// e.g. the `proof` field of an entry you read from your contract's state.
+export function decodeAnteProofValue(value: CborValue | undefined): AnteProof {
   const proof: AnteProof = {
     identityVk: asBytes(mapGet(value, "identity_vk")),
     purpose: asString(mapGet(value, "purpose")),
@@ -100,6 +105,24 @@ export function decodeAnteProof(cbor: Uint8Array): AnteProof {
   if (proof.identityVk.length !== 32) throw new Error("identity_vk must be 32 bytes");
   if (proof.signature.length !== 64) throw new Error("signature must be 64 bytes");
   return proof;
+}
+
+/// The wire form of an `AnteProof` as a CBOR value — the inverse of
+/// `decodeAnteProof`. Embed it in your own record before `cborEncode`:
+///
+///   cborEncode({ name, text, proof: anteProofToCborValue(proof) })
+///
+/// Field names and order match `ante_core::proof::AnteProof`, so `ante-core`
+/// on the contract side decodes it directly. `identity_vk` / `signature` go
+/// out as CBOR arrays of bytes, which is what ciborium emits for `[u8; N]`.
+export function anteProofToCborValue(proof: AnteProof): CborValue {
+  return {
+    identity_vk: Array.from(proof.identityVk),
+    purpose: proof.purpose,
+    nonce: proof.nonce,
+    ts: proof.ts,
+    signature: Array.from(proof.signature),
+  };
 }
 
 /// Short, stable handle for an identity — bs58 of the first 8 key bytes.

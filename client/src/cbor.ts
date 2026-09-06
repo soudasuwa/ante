@@ -181,7 +181,7 @@ function readValue(r: Reader): CborValue {
   }
 }
 
-export function mapGet(value: CborValue, key: string): CborValue | undefined {
+export function mapGet(value: CborValue | undefined, key: string): CborValue | undefined {
   return value instanceof Map ? value.get(key) : undefined;
 }
 

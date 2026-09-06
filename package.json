@@ -4,7 +4,8 @@
   "type": "module",
   "workspaces": [
     "client",
-    "web"
+    "web",
+    "examples/guestbook/web"
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",

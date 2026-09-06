@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ante guestbook</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>ante guestbook</h1>
+        <p class="sub">
+          Every post carries a proof of work. Entries are grouped by how much
+          the author committed.
+        </p>
+        <p id="status" class="status">connecting…</p>
+      </header>
+
+      <section id="compose" hidden>
+        <label>
+          Name
+          <input id="name" type="text" maxlength="40" placeholder="your name" />
+        </label>
+        <label>
+          Message
+          <textarea id="text" rows="3" maxlength="500" placeholder="say hello"></textarea>
+        </label>
+        <button id="post">Sign &amp; post</button>
+        <p id="progress" class="progress" hidden></p>
+      </section>
+
+      <div id="entries"></div>
+
+      <footer>
+        <a href="https://github.com/soudasuwa/ante">github.com/soudasuwa/ante</a>
+        — this is an integration example, not a hosted service.
+      </footer>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

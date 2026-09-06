@@ -158,6 +158,57 @@ fn an_entry_stored_under_a_mismatched_key_fails_validation() {
     assert!(matches!(validate(&cbor(&state)), ValidateResult::Invalid));
 }
 
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The exact CBOR a single-entry `GuestbookDelta` serializes to. The web
+/// client (`examples/guestbook/web/src/guestbook.ts`, via `@ante/client`'s
+/// `cborEncode`) builds this same blob and posts it as a delta UPDATE; a
+/// matching pin lives in that package's test suite. If this hex moves, the two
+/// sides have drifted and posts from the web app will stop validating.
+#[test]
+fn delta_cbor_wire_format_is_pinned() {
+    assert_eq!(hex(&cbor(&pinned_delta())), PINNED_DELTA_HEX);
+}
+
+/// Same blob, fed through `update_state` — proves the wire the web app emits is
+/// actually accepted, not just byte-stable.
+#[test]
+fn the_pinned_delta_is_accepted_by_update_state() {
+    let params = Parameters::from(cbor(&GuestbookParameters {
+        purpose: "ante-guestbook:post:v1".into(),
+        min_bits: 16,
+    }));
+    let data = vec![UpdateData::Delta(StateDelta::from(cbor(&pinned_delta())))];
+    let new_state = Contract::update_state(params, State::from(Vec::new()), data)
+        .expect("accepted")
+        .new_state
+        .expect("state");
+    let decoded: GuestbookState = from_cbor(&new_state).unwrap();
+    assert_eq!(decoded.entries.len(), 1);
+}
+
+const PINNED_DELTA_HEX: &str = "a167656e747269657381a3646e616d6565616c69636564746578746568656c6c6f6570726f6f66a56b6964656e746974795f766b982018ea184a186c186318e2189c18520a18be18f51850187b13182e18c518f918951847187618ae18be18be187b18921842181e18ea186914184618d2182c67707572706f736576616e74652d6775657374626f6f6b3a706f73743a7631656e6f6e6365192c396274731b00000191dd9dec00697369676e61747572659840184c1832182e1887185a1861187218b318a3189218a0181c18eb1869182e18ec18821863184718350418221718e5186f1839189c187618571822185d189618ec18561318fc183d184c18a4183d18d018ac18df18f418791866183418fc18d118e918e118c7186c1842184518211851186502182a1401186102";
+
+fn pinned_delta() -> GuestbookDelta {
+    let key = SigningKey::from_bytes(&[7u8; 32]);
+    let vk = key.verifying_key().to_bytes();
+    let nonce = pow::grind("ante-guestbook:post:v1", &vk, 16).expect("reachable");
+    GuestbookDelta {
+        entries: vec![Entry {
+            name: "alice".into(),
+            text: "hello".into(),
+            proof: AnteProof::create(
+                &key,
+                "ante-guestbook:post:v1".into(),
+                nonce,
+                1_726_000_000_000,
+            ),
+        }],
+    }
+}
+
 #[test]
 fn get_state_delta_returns_only_entries_the_peer_lacks() {
     let s1 = apply(&[], vec![entry(&author(13), "a", "one", PURPOSE, MIN_BITS)]).unwrap();

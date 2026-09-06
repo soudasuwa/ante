@@ -1,0 +1,22 @@
+{
+  "name": "ante-guestbook-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ante/client": "*",
+    "@freenetorg/freenet-stdlib": "^0.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6",
+    "vite": "^6.0",
+    "vitest": "^2.1"
+  }
+}

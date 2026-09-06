@@ -18,6 +18,8 @@ export {
   type VerifyResult,
   verifyAnteProof,
   decodeAnteProof,
+  decodeAnteProofValue,
+  anteProofToCborValue,
   proofBits,
   challengeBytes,
   fingerprint,
@@ -27,5 +29,14 @@ export {
 
 // Low-level pieces, for callers running their own grinder or wire handling.
 export { Grinder, grind, powBits, powDigest, leadingZeroBits } from "./pow";
-export { cborEncode, cborDecode } from "./cbor";
+// A CBOR codec matching ciborium — for building your own contract's wire types.
+export {
+  cborEncode,
+  cborDecode,
+  type CborValue,
+  mapGet,
+  asBytes,
+  asNumber,
+  asString,
+} from "./cbor";
 export { bytesToHex, hexToBytes, bytesEqual, base58 } from "./util";
