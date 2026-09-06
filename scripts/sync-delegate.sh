@@ -24,4 +24,4 @@ echo "  $GEN/ante_delegate.wasm  ($(wc -c < "$GEN/ante_delegate.wasm") bytes)"
 echo "  code_hash: $(cat "$GEN/ante_delegate_code_hash_bytes.json")"
 echo "  key:       $(cat "$GEN/ante_delegate_key_bytes.json")"
 echo
-echo "now: cd web && npm run dev   (or: npm run build)"
+echo "next: (cd web && npm run dev)"

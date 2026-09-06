@@ -42,4 +42,4 @@ fdev $FDEV_ARGS publish --code "$WASM" --parameters "$PARAMS" contract
 printf '%s\n' "$INSTANCE_ID" > "$GEN/registry_contract_id.txt"
 echo
 echo "staged $GEN/registry_contract_id.txt"
-echo "now: cd web && npm run build   (or restart npm run dev)"
+echo "next: rebuild or restart the UI — (cd web && npm run dev)"
