@@ -3,5 +3,3 @@
 node_modules
 dist
 .DS_Store
-*.wasm
-!web/src/**/*.wasm

@@ -1,0 +1,226 @@
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --fg: #1a1a1a;
+  --muted: #6a6a6a;
+  --line: #e2e2dd;
+  --card: #ffffff;
+  --accent: #3a5a9a;
+  --ok: #1a7f37;
+  --err: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16161a;
+    --fg: #e8e8e6;
+    --muted: #9a9a9a;
+    --line: #2c2c32;
+    --card: #1e1e24;
+    --accent: #7aa2e3;
+    --ok: #4ac26b;
+    --err: #f97066;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+#app {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  letter-spacing: -0.02em;
+}
+h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+.tagline {
+  color: var(--muted);
+  margin: 0.4rem 0 1rem;
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  margin-top: 1rem;
+}
+label {
+  display: block;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.9rem;
+}
+input[type="text"],
+input[type="number"],
+textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+textarea {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+input[type="range"] {
+  width: 70%;
+  vertical-align: middle;
+}
+output {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+button {
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  margin-top: 0.75rem;
+}
+button:hover {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+button.ghost {
+  border: none;
+  color: var(--muted);
+  text-decoration: underline;
+  padding: 0.2rem 0.3rem;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+.status {
+  font-size: 0.88rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  display: inline-block;
+}
+.status.ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+.status.warn {
+  color: #9a6a00;
+}
+.status.err {
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 40%, transparent);
+}
+dl.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0;
+}
+dl.kv dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+dl.kv dd {
+  margin: 0;
+}
+dd.wrap {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.progress {
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.result {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.result.ok {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+}
+.result.err {
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  color: var(--err);
+}
+ul.held {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+ul.held li {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+.held-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+.held-head span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.held-cbor {
+  display: block;
+  color: var(--muted);
+  margin: 0.35rem 0;
+  font-size: 0.75rem;
+}
+.held-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.held-actions button {
+  margin-top: 0;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.82rem;
+}
+footer {
+  margin-top: 2rem;
+}
+[hidden] {
+  display: none !important;
+}

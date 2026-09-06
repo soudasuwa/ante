@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ante</title>
+  </head>
+  <body>
+    <main id="app">
+      <header>
+        <h1>ante</h1>
+        <p class="tagline">
+          A small proof-of-work commitment for your Freenet identity — the step
+          between <em>no effort at all</em> and <em>a ghost key</em>.
+        </p>
+        <p id="conn" class="status">connecting to your node…</p>
+      </header>
+
+      <section id="identity-panel" hidden>
+        <h2>Your identity</h2>
+        <p class="muted">
+          One key, held by the ante delegate on your node. It never leaves it.
+        </p>
+        <dl class="kv">
+          <dt>fingerprint</dt>
+          <dd><code id="id-fingerprint">—</code></dd>
+          <dt>verifying key</dt>
+          <dd class="wrap">
+            <code id="id-vk">—</code>
+            <button data-copy="id-vk" class="ghost">copy</button>
+          </dd>
+        </dl>
+        <p class="muted">
+          Best identity-level proof so far: <strong id="id-level">none yet</strong>
+        </p>
+      </section>
+
+      <section id="strengthen-panel" hidden>
+        <h2>Strengthen your identity</h2>
+        <p class="muted">
+          Grind some bits against <code>ante:identity-level:v1</code>. The result
+          is a portable proof that this identity is not a one-off — worth at
+          least the bits it shows.
+        </p>
+        <label>
+          Target bits
+          <input type="range" id="strengthen-bits" min="14" max="26" value="18" />
+          <output id="strengthen-bits-out">18</output>
+        </label>
+        <button id="strengthen-go" class="primary">Grind &amp; commit</button>
+        <p id="strengthen-progress" class="progress" hidden></p>
+      </section>
+
+      <section id="action-panel" hidden>
+        <h2>Commit for an action</h2>
+        <p class="muted">
+          What an app does behind the scenes: grind against the app's purpose
+          string, then sign a one-off proof for that specific action.
+        </p>
+        <label>
+          Purpose
+          <input type="text" id="action-purpose" placeholder="myapp:comment:v1" />
+        </label>
+        <label>
+          Target bits
+          <input type="range" id="action-bits" min="10" max="26" value="20" />
+          <output id="action-bits-out">20</output>
+        </label>
+        <button id="action-go" class="primary">Grind &amp; commit</button>
+        <p id="action-progress" class="progress" hidden></p>
+      </section>
+
+      <section id="held-panel" hidden>
+        <h2>Proofs you hold</h2>
+        <p class="muted">
+          Stored in this browser only (Phase 1 has no registry). Copy one to
+          hand to an app, or paste it below to check it.
+        </p>
+        <ul id="held-list" class="held"></ul>
+      </section>
+
+      <section id="verify-panel">
+        <h2>Check a proof</h2>
+        <p class="muted">Works offline — one blake3 hash and one signature check.</p>
+        <label>
+          Proof (CBOR hex)
+          <textarea id="verify-input" rows="3" placeholder="a56b6964656e74697479…"></textarea>
+        </label>
+        <label>
+          Required bits
+          <input type="number" id="verify-bits" min="0" max="40" value="18" />
+        </label>
+        <button id="verify-go">Verify</button>
+        <p id="verify-result" class="result" hidden></p>
+      </section>
+
+      <footer>
+        <p class="muted">
+          A proof shows a key <em>cost something</em>. It does not show the key
+          is unique or human-held. See DESIGN.md.
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>

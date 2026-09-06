@@ -1,0 +1,10 @@
+[package]
+name = "delegate-key"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Dev tool: print the Freenet delegate code_hash and key for a WASM file."
+
+[dependencies]
+blake3 = { workspace = true }
