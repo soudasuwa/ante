@@ -90,17 +90,20 @@ pub fn emit_prompt(
         ));
     }
 
-    Ok(vec![OutboundDelegateMsg::RequestUserInput(UserInputRequest {
-        request_id,
-        message: {
-            let json = serde_json::json!(text);
-            NotificationMessage::try_from(&json).expect("a string is a valid NotificationMessage")
+    Ok(vec![OutboundDelegateMsg::RequestUserInput(
+        UserInputRequest {
+            request_id,
+            message: {
+                let json = serde_json::json!(text);
+                NotificationMessage::try_from(&json)
+                    .expect("a string is a valid NotificationMessage")
+            },
+            responses: vec![
+                freenet_stdlib::prelude::ClientResponse::new(ALLOW.to_vec()),
+                freenet_stdlib::prelude::ClientResponse::new(DENY.to_vec()),
+            ],
         },
-        responses: vec![
-            freenet_stdlib::prelude::ClientResponse::new(ALLOW.to_vec()),
-            freenet_stdlib::prelude::ClientResponse::new(DENY.to_vec()),
-        ],
-    })])
+    )])
 }
 
 /// Handle the user's answer to a commit prompt.

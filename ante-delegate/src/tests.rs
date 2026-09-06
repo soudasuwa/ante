@@ -126,7 +126,9 @@ fn challenge_rejects_empty_purpose() {
     let resp = decode_reply(&run(
         &mut env,
         &origin_a(),
-        AnteRequest::Challenge { purpose: String::new() },
+        AnteRequest::Challenge {
+            purpose: String::new(),
+        },
     ));
     assert!(matches!(resp, AnteResponse::Error { .. }));
 }
@@ -211,14 +213,13 @@ fn allow_signs_a_verifiable_proof_and_clears_context() {
     };
     let proof: AnteProof = ante_core::from_cbor(&proof).expect("proof decodes");
 
-    let bits = proof.verify(BITS).expect("proof verifies at the committed bar");
+    let bits = proof
+        .verify(BITS)
+        .expect("proof verifies at the committed bar");
     assert!(bits >= BITS);
     assert_eq!(proof.purpose, PURPOSE);
     assert_eq!(proof.nonce, nonce);
-    assert_eq!(
-        proof.identity_vk,
-        expected_key().verifying_key().to_bytes()
-    );
+    assert_eq!(proof.identity_vk, expected_key().verifying_key().to_bytes());
     assert!(env.context_is_empty(), "context cleared after answering");
 }
 
@@ -269,7 +270,10 @@ fn a_dropped_context_write_fails_the_commit_loudly() {
     run(&mut env, &origin_a(), AnteRequest::GetIdentity);
     env.fail_next_context_write();
     let err = dispatch(&mut env, Some(&origin_a()), commit_req(good_nonce(), BITS));
-    assert!(err.is_err(), "a dropped park must not silently lose the prompt");
+    assert!(
+        err.is_err(),
+        "a dropped park must not silently lose the prompt"
+    );
 }
 
 #[test]

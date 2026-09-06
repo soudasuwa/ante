@@ -71,10 +71,7 @@ pub fn load_or_create(
 
 /// Load an origin's key **without** creating one. Returns `None` if this origin
 /// has no identity yet.
-pub fn load_existing(
-    env: &impl DelegateEnv,
-    origin: Option<&MessageOrigin>,
-) -> Option<SigningKey> {
+pub fn load_existing(env: &impl DelegateEnv, origin: Option<&MessageOrigin>) -> Option<SigningKey> {
     let seed: [u8; 32] = env.get_secret(&secret_key_for(origin))?.try_into().ok()?;
     Some(SigningKey::from_bytes(&seed))
 }
