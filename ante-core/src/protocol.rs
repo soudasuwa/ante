@@ -1,13 +1,13 @@
 //! Wire protocol between an app (or the bundled UI) and the ante delegate.
 //!
 //! Requests and responses are CBOR-encoded and carried in the payload of a
-//! Freenet `ApplicationMessage`. The delegate custodies one Ed25519 identity
-//! key per calling origin; an app never sees the private key, only the
-//! verifying key and finished [`AnteProof`]s.
+//! Freenet `ApplicationMessage`. The delegate custodies **one** Ed25519
+//! identity key per user, shared across every calling app; an app never sees
+//! the private key, only the verifying key and finished [`AnteProof`]s.
 //!
 //! Flow:
 //! 1. [`AnteRequest::GetIdentity`] — learn (and, first time, create) the
-//!    identity for this origin. No prompt.
+//!    user's identity. No prompt.
 //! 2. [`AnteRequest::Challenge`] — get the exact bytes to grind, so the client
 //!    never has to reproduce the domain-separation layout. No prompt.
 //! 3. grind a nonce off-thread (see the `pow` module / the JS worker).
@@ -19,12 +19,12 @@ use serde::{Deserialize, Serialize};
 /// Requests an app sends to the ante delegate.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum AnteRequest {
-    /// Return this origin's identity verifying key, creating and persisting a
+    /// Return the user's identity verifying key, creating and persisting a
     /// keypair first if none exists yet. Never prompts — it only exposes a
     /// public key.
     GetIdentity,
 
-    /// Return the challenge bytes for `purpose` bound to this origin's
+    /// Return the challenge bytes for `purpose` bound to the user's
     /// identity. The client feeds these to the grinder as
     /// `blake3(bytes || nonce_le)` and counts leading zero bits. Never
     /// prompts.

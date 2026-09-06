@@ -76,6 +76,36 @@ textarea {
   color: var(--fg);
   font: inherit;
 }
+/* Inline number inputs (e.g. "Grind to [N] bits"). */
+label input[type="number"] {
+  width: 4.5rem;
+  display: inline-block;
+  margin: 0 0.3rem;
+  text-align: center;
+}
+h2 .tag {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+}
+.result-block {
+  margin-top: 0.9rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.wrap-code {
+  display: block;
+  word-break: break-all;
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0.35rem 0;
+}
 textarea {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.82rem;

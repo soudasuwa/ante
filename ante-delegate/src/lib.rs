@@ -1,9 +1,10 @@
 //! # ante-delegate
 //!
-//! The Freenet delegate behind **ante**. It custodies one Ed25519 identity key
-//! per calling origin in the node's encrypted secret store, and — behind a
-//! user consent prompt — signs [`AnteProof`](ante_core::AnteProof)s over
-//! proof-of-work the caller supplies.
+//! The Freenet delegate behind **ante**. It custodies **one** Ed25519 identity
+//! key per user in the node's encrypted secret store — shared across every app
+//! that talks to the delegate, so a level published to the registry is
+//! portable. Behind a user consent prompt it signs
+//! [`AnteProof`](ante_core::AnteProof)s over proof-of-work the caller supplies.
 //!
 //! The private key never leaves the delegate. An app only ever sees the
 //! verifying key and finished proofs.
@@ -12,7 +13,7 @@
 //!
 //! | Request | Prompts? | Returns |
 //! |---|---|---|
-//! | `GetIdentity` | no | the origin's verifying key (created on first use) |
+//! | `GetIdentity` | no | the identity verifying key (created on first use) |
 //! | `Challenge { purpose }` | no | the exact bytes to grind |
 //! | `Commit { purpose, nonce, min_bits, ts }` | **yes** | a signed `AnteProof`, or `Denied` |
 //!
@@ -80,7 +81,7 @@ fn dispatch(
 ) -> Result<Vec<OutboundDelegateMsg>, DelegateError> {
     match request {
         AnteRequest::GetIdentity | AnteRequest::Challenge { .. } => {
-            match identity::load_or_create(env, origin) {
+            match identity::load_or_create(env) {
                 Ok(key) => Ok(vec![reply(&handler::handle_simple(&key, &request))]),
                 Err(message) => Ok(vec![reply(&AnteResponse::Error { message })]),
             }
@@ -95,7 +96,7 @@ fn dispatch(
             if let Err(message) = handler::check_purpose(&purpose) {
                 return Ok(vec![reply(&AnteResponse::Error { message })]);
             }
-            let key = match identity::load_or_create(env, origin) {
+            let key = match identity::load_or_create(env) {
                 Ok(k) => k,
                 Err(message) => return Ok(vec![reply(&AnteResponse::Error { message })]),
             };

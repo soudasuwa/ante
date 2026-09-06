@@ -19,7 +19,9 @@
       <section id="identity-panel" hidden>
         <h2>Your identity</h2>
         <p class="muted">
-          One key, held by the ante delegate on your node. It never leaves it.
+          One key, held by the ante delegate on your node — shared across every
+          app you use ante with, so its level is portable. It never leaves the
+          delegate.
         </p>
         <dl class="kv">
           <dt>fingerprint</dt>
@@ -29,60 +31,47 @@
             <code id="id-vk">—</code>
             <button data-copy="id-vk" class="ghost">copy</button>
           </dd>
+          <dt>level</dt>
+          <dd><strong id="id-level">checking…</strong></dd>
         </dl>
-        <dl class="kv">
-          <dt>on the registry</dt>
-          <dd><strong id="id-registry-level">—</strong></dd>
-          <dt>signed this session</dt>
-          <dd><strong id="id-level">none this session</strong></dd>
-        </dl>
-      </section>
 
-      <section id="strengthen-panel" hidden>
-        <h2>Strengthen your identity</h2>
-        <p class="muted">
-          Grind some bits against <code>ante:identity-level:v1</code>. The result
-          is a portable proof that this identity is not a one-off — worth at
-          least the bits it shows.
-        </p>
         <label>
-          Target bits
-          <input type="range" id="strengthen-bits" min="14" max="26" value="18" />
-          <output id="strengthen-bits-out">18</output>
+          Grind to
+          <input type="number" id="improve-bits" min="1" max="32" step="1" value="18" />
+          bits
         </label>
-        <button id="strengthen-go" class="primary">Grind &amp; commit</button>
-        <p id="strengthen-progress" class="progress" hidden></p>
+        <p class="muted">
+          Each bit roughly doubles the work. ~18 is under a second; ~24 is a few
+          seconds; ~28 is tens of seconds. The registry only ever raises your
+          level, so aim above where you are.
+        </p>
+        <button id="improve-go" class="primary">Prove identity</button>
+        <p id="improve-progress" class="progress" hidden></p>
       </section>
 
       <section id="action-panel" hidden>
-        <h2>Commit for an action</h2>
+        <h2>Commit for an action <span class="tag">what an app does</span></h2>
         <p class="muted">
-          What an app does behind the scenes: grind against the app's purpose
-          string, then sign a one-off proof for that specific action.
+          Behind the scenes, an app grinds against its own purpose string and
+          has you sign a one-off proof for that specific action — it never shows
+          you a hex string. This panel does it by hand so you can see the shape.
         </p>
         <label>
           Purpose
           <input type="text" id="action-purpose" placeholder="myapp:comment:v1" />
         </label>
         <label>
-          Target bits
-          <input type="range" id="action-bits" min="10" max="26" value="20" />
-          <output id="action-bits-out">20</output>
+          Grind to
+          <input type="number" id="action-bits" min="1" max="32" step="1" value="20" />
+          bits
         </label>
         <button id="action-go" class="primary">Grind &amp; commit</button>
         <p id="action-progress" class="progress" hidden></p>
-      </section>
-
-      <section id="held-panel" hidden>
-        <h2>Signed this session</h2>
-        <p class="muted">
-          Proofs you've signed since opening this tab. Copy one to hand to an
-          app, or paste it below to check it. Identity-level proofs also go to
-          the registry; per-action proofs are yours to send where they're
-          needed.
-        </p>
-        <p id="held-note" class="muted"></p>
-        <ul id="held-list" class="held"></ul>
+        <div id="action-result" class="result-block" hidden>
+          <p class="muted">The proof (CBOR hex) — this is what the app receives:</p>
+          <code id="action-proof" class="wrap-code"></code>
+          <button data-copy="action-proof" class="ghost">copy</button>
+        </div>
       </section>
 
       <section id="verify-panel">

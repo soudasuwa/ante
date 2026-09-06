@@ -67,37 +67,34 @@ export async function registerDelegate(
 }
 
 const OUTBOUND_APPLICATION_MESSAGE = 1; // OutboundDelegateMsgType.common_ApplicationMessage
-const OUTBOUND_REQUEST_USER_INPUT = 2; // OutboundDelegateMsgType.RequestUserInput
 
 export interface DelegateReply {
-  /// ApplicationMessage payloads in the response (the actual answers).
+  /// ApplicationMessage payloads in the response — the delegate's answers.
   payloads: Uint8Array[];
-  /// True if the response also carried a RequestUserInput — i.e. the delegate
-  /// raised a consent prompt and the real answer will arrive later.
-  raisedPrompt: boolean;
 }
 
 function readReply(response: DelegateResponse): DelegateReply {
   const payloads: Uint8Array[] = [];
-  let raisedPrompt = false;
   for (const outbound of response.values ?? []) {
     if (outbound.inboundType === OUTBOUND_APPLICATION_MESSAGE) {
       const msg = outbound.inbound as { payload?: number[] } | null;
       if (msg?.payload?.length) payloads.push(Uint8Array.from(msg.payload));
-    } else if (outbound.inboundType === OUTBOUND_REQUEST_USER_INPUT) {
-      raisedPrompt = true;
     }
+    // A RequestUserInput is consumed by the node's runtime (it drives the
+    // consent prompt) and never reaches the client — the one DelegateResponse
+    // we get back carries the post-approval outcome.
   }
-  return { payloads, raisedPrompt };
+  return { payloads };
 }
 
-/// Send one ApplicationMessage payload to the delegate and read its immediate
-/// reply. If the delegate raised a consent prompt, `raisedPrompt` is true and
-/// `payloads` is usually empty — call [`awaitPromptResult`] next.
+/// Send one ApplicationMessage payload to the delegate and read the response.
+/// For a `Commit`, the node holds this open until the user answers the consent
+/// prompt, so pass a `timeoutMs` past the node's own 60 s window.
 export async function sendToDelegate(
   client: FreenetClient,
   address: DelegateAddress,
   payload: Uint8Array,
+  timeoutMs?: number,
 ): Promise<DelegateReply> {
   const appMsg = new ApplicationMessageT(Array.from(payload), [], false);
   const inbound = new InboundDelegateMsgT(
@@ -109,19 +106,7 @@ export async function sendToDelegate(
   const delegateReq = new DelegateRequest(DelegateRequestType.ApplicationMessages, appMessages);
   const clientReq = new ClientRequestT(ClientRequestType.DelegateRequest, delegateReq);
 
-  const pending = client.awaitDelegateResponse(address.keyBytes);
+  const pending = client.awaitDelegateResponse(address.keyBytes, timeoutMs);
   (client.api as unknown as { sendRequest(r: ClientRequestT): void }).sendRequest(clientReq);
   return readReply(await pending);
-}
-
-/// After a prompt was raised, wait for the follow-up response the node sends
-/// once the user answers the shell overlay. `timeoutMs` is generous — the user
-/// has to read and click.
-export async function awaitPromptResult(
-  client: FreenetClient,
-  address: DelegateAddress,
-  timeoutMs = 180_000,
-): Promise<Uint8Array[]> {
-  const response = await client.awaitDelegateResponse(address.keyBytes, timeoutMs);
-  return readReply(response).payloads;
 }

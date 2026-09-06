@@ -1,51 +1,50 @@
-//! Per-origin identity key custody.
+//! Identity key custody.
 //!
-//! Every calling origin (a web app's container contract, or another delegate)
-//! gets its own isolated Ed25519 identity. The key lives in the node's
-//! encrypted secret store, namespaced by the runtime-attested origin, and
-//! never leaves the delegate.
+//! There is **one** ante identity per user, shared across every app that talks
+//! to this delegate — that is what makes a level portable (grind once, every
+//! app reads it from the registry). The key lives in the node's encrypted
+//! secret store and never leaves the delegate. The consent prompt, which shows
+//! the runtime-attested calling app, is the safeguard against a rogue app
+//! spending the identity without the user knowing.
+//!
+//! Privacy note for callers: apps the user commits with can tell it is the
+//! same key. Unlinkable per-action commitment is a different mechanism (raw
+//! per-post proof-of-work), not this.
 
 use ed25519_dalek::SigningKey;
 use freenet_stdlib::prelude::MessageOrigin;
 
 use crate::env::DelegateEnv;
 
-/// Storage-format version. Bumping this stranding every existing key, so it
-/// only moves on a deliberate migration.
-const NS_PREFIX: &[u8] = b"ante:identity:v1:";
+/// Secret-store key for the identity signing seed. One fixed slot — changing
+/// it strands the existing key exactly like a WASM re-key would.
+const IDENTITY_SEED_KEY: &[u8] = b"ante:identity:v1:primary";
 
-/// Secret-store key for an origin's identity signing seed.
-///
-/// The layout is part of the delegate's on-disk format: changing it strands
-/// existing keys exactly like a WASM re-key would.
-pub fn secret_key_for(origin: Option<&MessageOrigin>) -> Vec<u8> {
-    let mut key = NS_PREFIX.to_vec();
+/// A short, stable tag for a calling origin — used to check that a
+/// `UserResponse` came back from the same app that raised the prompt. Not a
+/// storage namespace (the identity is shared); just an equality token.
+pub fn origin_tag(origin: Option<&MessageOrigin>) -> Vec<u8> {
     match origin {
         Some(MessageOrigin::WebApp(id)) => {
-            key.extend_from_slice(b"webapp:");
-            key.extend_from_slice(id.as_bytes());
+            let mut t = b"webapp:".to_vec();
+            t.extend_from_slice(id.as_bytes());
+            t
         }
         Some(MessageOrigin::Delegate(dk)) => {
-            key.extend_from_slice(b"delegate:");
-            key.extend_from_slice(dk.bytes());
+            let mut t = b"delegate:".to_vec();
+            t.extend_from_slice(dk.bytes());
+            t
         }
-        None => key.extend_from_slice(b"unattested"),
-        // MessageOrigin is #[non_exhaustive]: a future variant gets a stable
-        // bucket rather than a compile break.
-        Some(_) => key.extend_from_slice(b"unknown-origin"),
+        None => b"unattested".to_vec(),
+        // MessageOrigin is #[non_exhaustive].
+        Some(_) => b"unknown-origin".to_vec(),
     }
-    key
 }
 
-/// Load the origin's signing key, generating and persisting one from host
-/// entropy on first use.
-pub fn load_or_create(
-    env: &mut impl DelegateEnv,
-    origin: Option<&MessageOrigin>,
-) -> Result<SigningKey, String> {
-    let store_key = secret_key_for(origin);
-
-    if let Some(stored) = env.get_secret(&store_key) {
+/// Load the identity key, generating and persisting one from host entropy on
+/// first use.
+pub fn load_or_create(env: &mut impl DelegateEnv) -> Result<SigningKey, String> {
+    if let Some(stored) = env.get_secret(IDENTITY_SEED_KEY) {
         let seed: [u8; 32] = stored
             .try_into()
             .map_err(|_| "stored identity seed has the wrong length".to_string())?;
@@ -63,15 +62,14 @@ pub fn load_or_create(
     }
 
     let key = SigningKey::from_bytes(&seed);
-    if !env.set_secret(&store_key, &seed) {
+    if !env.set_secret(IDENTITY_SEED_KEY, &seed) {
         return Err("failed to persist the identity key".to_string());
     }
     Ok(key)
 }
 
-/// Load an origin's key **without** creating one. Returns `None` if this origin
-/// has no identity yet.
-pub fn load_existing(env: &impl DelegateEnv, origin: Option<&MessageOrigin>) -> Option<SigningKey> {
-    let seed: [u8; 32] = env.get_secret(&secret_key_for(origin))?.try_into().ok()?;
+/// Load the identity key **without** creating one. `None` if none exists yet.
+pub fn load_existing(env: &impl DelegateEnv) -> Option<SigningKey> {
+    let seed: [u8; 32] = env.get_secret(IDENTITY_SEED_KEY)?.try_into().ok()?;
     Some(SigningKey::from_bytes(&seed))
 }

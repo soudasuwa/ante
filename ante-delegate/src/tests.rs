@@ -64,19 +64,21 @@ fn get_identity_creates_then_reuses_one_key() {
 }
 
 #[test]
-fn different_origins_get_different_identities() {
+fn every_app_sees_the_same_identity() {
+    // The identity is one shared key — that is what makes a registry level
+    // portable. Two different calling apps must get the same verifying key,
+    // and the second call must not mint a second key.
     let mut env = env();
     let a = decode_reply(&run(&mut env, &origin_a(), AnteRequest::GetIdentity));
+    env.fail_next_set_secret(); // a second mint would try to persist and fail
     let b = decode_reply(&run(&mut env, &origin_b(), AnteRequest::GetIdentity));
-    // Same injected entropy, but the second origin's slot is empty on first
-    // touch so it still mints — and `TestEnv` hands out the same seed, so the
-    // keys collide here. What must differ is the *storage slot*: prove the two
-    // origins are namespaced apart.
+    assert_eq!(a, b);
+    assert!(matches!(a, AnteResponse::Identity { .. }));
+    // The prompt-origin check still distinguishes apps.
     assert_ne!(
-        identity::secret_key_for(Some(&origin_a())),
-        identity::secret_key_for(Some(&origin_b()))
+        identity::origin_tag(Some(&origin_a())),
+        identity::origin_tag(Some(&origin_b()))
     );
-    assert_eq!(a, b); // (documents the test-double's fixed entropy)
 }
 
 #[test]

@@ -25,9 +25,9 @@ const DENY: &[u8] = b"Deny";
 #[derive(Serialize, Deserialize)]
 pub struct PendingCommit {
     request_id: u32,
-    /// The origin-namespace bytes the prompt was raised for. An answer under a
-    /// different origin is not an answer to this question.
-    origin_ns: Vec<u8>,
+    /// The calling app the prompt was raised for. An answer from a different
+    /// app is not an answer to this question.
+    origin_tag: Vec<u8>,
     purpose: String,
     nonce: u64,
     ts: u64,
@@ -79,7 +79,7 @@ pub fn emit_prompt(
 
     let pending = PendingCommit {
         request_id,
-        origin_ns: identity::secret_key_for(origin),
+        origin_tag: identity::origin_tag(origin),
         purpose: purpose.to_string(),
         nonce,
         ts,
@@ -131,9 +131,9 @@ pub fn handle_response(
     // WHOSE. A genuine answer is fed back through the same invocation chain
     // that raised the prompt, so it always arrives under the same attested
     // origin. Anything else is someone answering a dialog that was not theirs.
-    if identity::secret_key_for(origin) != pending.origin_ns {
+    if identity::origin_tag(origin) != pending.origin_tag {
         return Err(DelegateError::Other(
-            "user response came from a different origin than the prompt".to_string(),
+            "user response came from a different app than the prompt".to_string(),
         ));
     }
 
@@ -144,7 +144,7 @@ pub fn handle_response(
         return Ok(vec![reply(&AnteResponse::Denied)]);
     }
 
-    let key: SigningKey = identity::load_existing(env, origin)
+    let key: SigningKey = identity::load_existing(env)
         .ok_or_else(|| DelegateError::Other("identity vanished mid-prompt".to_string()))?;
     let proof = AnteProof::create(&key, pending.purpose, pending.nonce, pending.ts);
     Ok(vec![reply(&AnteResponse::Committed {

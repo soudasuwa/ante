@@ -3,8 +3,14 @@
 
 import { asBytes, asString, cborDecode, cborEncode, CborValue, enumVariant, mapGet } from "./cbor";
 import { decodeAnteProof, type AnteProof } from "./ante-proof";
-import { awaitPromptResult, sendToDelegate, type DelegateAddress } from "./delegate-api";
+import { sendToDelegate, type DelegateAddress } from "./delegate-api";
 import type { FreenetClient } from "./freenet";
+
+/// The node blocks a `Commit` request while the consent prompt is on screen —
+/// up to exactly 60 s (`USER_INPUT_TIMEOUT` in freenet-core), then auto-denies.
+/// There is no intermediate signal; the one response carries the final
+/// outcome. Wait a little past the node's own window.
+const COMMIT_TIMEOUT_MS = 75_000;
 
 export type CommitOutcome =
   | { kind: "committed"; proof: AnteProof; proofCbor: Uint8Array }
@@ -30,33 +36,31 @@ export class AnteClient {
     return asBytes(mapGet(reply.fields!, "bytes"));
   }
 
-  /// Ask the user to authorize spending this identity on `purpose`, and on
-  /// approval get back a signed proof. Raises the shell consent prompt; the
-  /// returned promise resolves only after the user answers it.
+  /// Ask the user to authorize spending the identity on `purpose`, and on
+  /// approval get back a signed proof. The node shows the consent prompt in
+  /// every open Freenet tab and holds this request open until the user answers
+  /// (or 60 s elapses → `denied`). `onPending` fires once the request is in
+  /// flight so the UI can say "approve the prompt".
   async commit(
     purpose: string,
     nonce: number,
     minBits: number,
-    onPrompt?: () => void,
+    onPending?: () => void,
   ): Promise<CommitOutcome> {
     const request: CborValue = {
       Commit: { purpose, nonce, min_bits: minBits, ts: Date.now() },
     };
-    const reply = await sendToDelegate(this.client, this.delegate, cborEncode(request));
-
-    // The delegate rejected the nonce (or the request) before prompting.
-    if (reply.payloads.length > 0) {
-      return this.interpretCommit(reply.payloads[0]);
+    onPending?.();
+    const reply = await sendToDelegate(
+      this.client,
+      this.delegate,
+      cborEncode(request),
+      COMMIT_TIMEOUT_MS,
+    );
+    if (reply.payloads.length === 0) {
+      throw new Error("no response from the delegate for the commit");
     }
-    if (!reply.raisedPrompt) {
-      throw new Error("delegate returned neither a prompt nor a response");
-    }
-
-    // Prompt is on screen in every open Freenet tab. Wait for the answer.
-    onPrompt?.();
-    const payloads = await awaitPromptResult(this.client, this.delegate);
-    if (payloads.length === 0) throw new Error("no response after the consent prompt");
-    return this.interpretCommit(payloads[0]);
+    return this.interpretCommit(reply.payloads[0]);
   }
 
   private interpretCommit(payload: Uint8Array): CommitOutcome {
