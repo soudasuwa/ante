@@ -7,7 +7,16 @@
 //! `freenet_stdlib::delegate_interface::{CodeHash::from_code, generate_id}`.
 //!
 //! Usage: `delegate-key <path-to.wasm>`
-//! Output (stdout): two lines, `code_hash <json-array>` and `key <json-array>`.
+//!
+//! Output (stdout), one `name value` pair per line — consumers match the name
+//! exactly, so new lines can be added without breaking them:
+//!
+//! ```text
+//! code_hash     [12,34,...]   json array, for embedding in TypeScript
+//! key           [56,78,...]
+//! code_hash_hex 0c22...       hex, for the committed key record
+//! key_hex       384e...
+//! ```
 
 use std::process::ExitCode;
 
@@ -34,10 +43,16 @@ fn main() -> ExitCode {
 
     println!("code_hash {}", json_array(code_hash.as_bytes()));
     println!("key {}", json_array(&key));
+    println!("code_hash_hex {}", hex(code_hash.as_bytes()));
+    println!("key_hex {}", hex(&key));
     ExitCode::SUCCESS
 }
 
 fn json_array(bytes: &[u8]) -> String {
     let inner: Vec<String> = bytes.iter().map(|b| b.to_string()).collect();
     format!("[{}]", inner.join(","))
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

@@ -44,6 +44,14 @@ pub mod proof;
 pub mod protocol;
 pub mod registry;
 
+/// The pinned cross-implementation vector.
+///
+/// Ideally this would sit behind a `testvec` feature so it is not public API
+/// at all. It does not, because gating it changes the compiled bytes of
+/// `ante-core`, which changes the delegate WASM, which moves the delegate key
+/// and strands every stored identity — for a module the linker already
+/// eliminates (measured: byte-identical contract WASMs either way). It is
+/// listed in DESIGN.md to be batched with the next deliberate re-key.
 #[doc(hidden)]
 pub mod testvec;
 

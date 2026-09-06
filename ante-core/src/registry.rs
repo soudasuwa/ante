@@ -51,6 +51,28 @@ pub struct RegistryDelta {
 }
 
 /// A summary for anti-entropy: identity → bits the peer already has.
+///
+/// **Known limit: this is linear in the number of registered identities.** A
+/// summary ships to every interested peer on every anti-entropy heartbeat
+/// (~5 min) whether or not anything changed, so its size is a standing
+/// bandwidth cost, not a per-update one. Each entry costs ~42 CBOR bytes
+/// (a 32-byte key encodes as a 34-byte array header + bytes, plus 1–5 for the
+/// u32), so:
+///
+/// | identities | summary |
+/// |---|---|
+/// | 1 000 | ~42 KB |
+/// | 10 000 | ~420 KB |
+///
+/// That is fine at the scale this is built for and untenable past roughly
+/// 5 000 identities. The fix, when it is needed, is the standard one: replace
+/// the flat map with K fixed buckets each holding a digest of that bucket's
+/// contents, making the summary constant-size at the cost of `get_state_delta`
+/// returning a superset of the true delta. That is sound here because
+/// [`RegistryState::admit`] is idempotent — re-applying a proof already held is
+/// a no-op. It is deferred only because changing this type re-keys the contract
+/// and strands every published level, so it should be batched with any other
+/// wire change rather than shipped alone.
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct RegistrySummary {
     pub bits: BTreeMap<[u8; 32], u32>,
@@ -267,6 +289,117 @@ mod tests {
                 .verifying_key()
                 .to_bytes()
         );
+    }
+
+    // --- merge laws -------------------------------------------------------
+    //
+    // Replicas converge only if merge is a join: idempotent, commutative, and
+    // associative over the exact stored bytes. Freenet delivers at-least-once
+    // and in any order, so all three are load-bearing — idempotence especially,
+    // because a merge that changes state on re-application never settles.
+
+    /// Same proof, different `ts` — identical bit count, different signature.
+    /// The tie-break has to pick one of these deterministically.
+    fn tied_pair(seed: u8, bits: u32) -> (AnteProof, AnteProof) {
+        let key = SigningKey::from_bytes(&[seed; 32]);
+        let vk = key.verifying_key().to_bytes();
+        let nonce = pow::grind(PURPOSE, &vk, bits).expect("reachable");
+        (
+            AnteProof::create(&key, PURPOSE.into(), nonce, 1_700_000_000_000),
+            AnteProof::create(&key, PURPOSE.into(), nonce, 1_700_000_000_001),
+        )
+    }
+
+    fn state_of(proofs: &[AnteProof]) -> RegistryState {
+        let mut s = RegistryState::default();
+        for p in proofs {
+            let _ = s.admit(&params(8), p.clone());
+        }
+        s
+    }
+
+    #[test]
+    fn merge_is_idempotent() {
+        let a = state_of(&[proof_for(20, PURPOSE, 12), proof_for(21, PURPOSE, 14)]);
+
+        let mut once = a.clone();
+        once.merge(&params(8), &a);
+        assert_eq!(once, a, "merging a state with itself must not change it");
+
+        let mut twice = once.clone();
+        twice.merge(&params(8), &a);
+        assert_eq!(twice, once, "and must stay put on redelivery");
+    }
+
+    #[test]
+    fn admitting_the_same_proof_twice_is_a_no_op() {
+        let p = proof_for(22, PURPOSE, 12);
+        let mut state = RegistryState::default();
+        assert_eq!(state.admit(&params(8), p.clone()), Ok(true));
+        let after_first = state.clone();
+        assert_eq!(state.admit(&params(8), p), Ok(false));
+        assert_eq!(state, after_first);
+    }
+
+    #[test]
+    fn merge_is_associative() {
+        let a = state_of(&[proof_for(23, PURPOSE, 10)]);
+        let b = state_of(&[proof_for(23, PURPOSE, 14), proof_for(24, PURPOSE, 12)]);
+        let c = state_of(&[proof_for(24, PURPOSE, 16), proof_for(25, PURPOSE, 11)]);
+
+        let mut left = a.clone(); // (a ∪ b) ∪ c
+        left.merge(&params(8), &b);
+        left.merge(&params(8), &c);
+
+        let mut bc = b.clone(); // a ∪ (b ∪ c)
+        bc.merge(&params(8), &c);
+        let mut right = a.clone();
+        right.merge(&params(8), &bc);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn a_tie_resolves_the_same_way_on_every_peer() {
+        let (first, second) = tied_pair(26, 12);
+        let vk = first.identity_vk;
+
+        // Two peers see the tied proofs in opposite orders.
+        let mut peer_a = state_of(&[first.clone(), second.clone()]);
+        let peer_b = state_of(&[second, first]);
+        assert_eq!(peer_a, peer_b, "the tie-break must not depend on order");
+
+        // And merging the two settles immediately rather than flapping.
+        let before = peer_a.clone();
+        peer_a.merge(&params(8), &peer_b);
+        assert_eq!(peer_a, before);
+        assert!(peer_a.level(&vk).unwrap() >= 12);
+    }
+
+    #[test]
+    fn a_converged_peer_gets_an_empty_delta() {
+        // `get_state_delta` must not re-ship state a peer already holds — the
+        // delta to an up-to-date peer carries no proofs at all.
+        let state = state_of(&[proof_for(27, PURPOSE, 12), proof_for(28, PURPOSE, 13)]);
+        let delta = state.delta_since(&state.summarize());
+        assert!(delta.proofs.is_empty(), "converged peers exchange nothing");
+    }
+
+    #[test]
+    fn a_delta_applied_twice_lands_in_the_same_place() {
+        let source = state_of(&[proof_for(29, PURPOSE, 12)]);
+        let delta = source.delta_since(&RegistrySummary::default());
+
+        let mut peer = RegistryState::default();
+        for p in &delta.proofs {
+            let _ = peer.admit(&params(8), p.clone());
+        }
+        let after_first = peer.clone();
+        for p in &delta.proofs {
+            let _ = peer.admit(&params(8), p.clone());
+        }
+        assert_eq!(peer, after_first);
+        assert_eq!(peer, source);
     }
 
     #[test]

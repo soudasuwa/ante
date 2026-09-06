@@ -17,8 +17,9 @@ OUT="$REPO_ROOT/client/src/embedded.ts"
 WASM="${1:?usage: gen-embedded.sh <delegate.wasm> [registry-id]}"
 
 KEYINFO="$(cargo run -q --manifest-path "$REPO_ROOT/Cargo.toml" -p delegate-key -- "$WASM")"
-KEY="$(echo "$KEYINFO" | awk '/^key/ {print $2}')"
-CODE_HASH="$(echo "$KEYINFO" | awk '/^code_hash/ {print $2}')"
+# Match the field name exactly — the tool also prints key_hex / code_hash_hex.
+KEY="$(echo "$KEYINFO" | awk '$1 == "key" {print $2}')"
+CODE_HASH="$(echo "$KEYINFO" | awk '$1 == "code_hash" {print $2}')"
 B64="$(base64 -w0 < "$WASM" 2>/dev/null || base64 < "$WASM" | tr -d '\n')"
 
 if [ "${2-}" != "" ]; then

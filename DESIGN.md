@@ -131,6 +131,31 @@ a bug fix, a dependency bump — produces a new key and strands what was stored
 under the old one: every user's identity seed (delegate) and every published
 level (registry).
 
+**How little it takes.** `panic!` and `expect` bake `line!()` into the binary,
+so *adding a comment line* in `ante-core` above one of them shifts the constant
+and changes the delegate's bytes. Measured, not theorised: one comment line at
+the top of `ante-core/src/lib.rs` moves the key, because `to_cbor`'s
+`expect("CBOR serialization cannot fail")` sits below it and the delegate calls
+`to_cbor` on every reply. Treat `ante-core` and `ante-delegate` as frozen
+between deliberate releases; batch edits rather than trickling them.
+
+Two guards make that concrete, both run in CI:
+
+- `scripts/check-delegate-key.sh` compares the built key against the committed
+  `ante-delegate/delegate-key.toml`. A re-key fails the build until someone
+  records it with `ANTE_ACCEPT_REKEY=1`, which turns it into a reviewable diff.
+- The same job builds the delegate twice from clean and compares hashes, so a
+  build that is not byte-stable is caught here rather than in production. (This
+  is why `wasm-opt` is *not* run: it is deterministic only for a fixed version,
+  and "is binaryen installed" is not a property the key may depend on.)
+
+Deferred to the next deliberate re-key, because each would move the key on its
+own for no user-visible gain:
+
+- Put `ante_core::testvec` behind a `testvec` feature so it is not public API.
+  (The linker already eliminates it — contract WASMs are byte-identical either
+  way — so this is hygiene, not size.)
+
 The committed per-crate `Cargo.lock` prevents *accidental* re-keys. For the
 delegate, `ExportIdentity` / `ImportIdentity` already give the user a manual
 path across a re-key: save the recovery code before upgrading, restore it

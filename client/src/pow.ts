@@ -64,11 +64,23 @@ export class Grinder {
   }
 }
 
-/// Synchronous grind — tests and the worker's inner loop.
-export function grind(challenge: Uint8Array, targetBits: number): number {
+/// Expected tries to clear `bits` is 2^bits, so a target much past ~32 is not a
+/// grind, it is a hang. Cap the synchronous helper at a budget a caller can
+/// reason about rather than spinning forever on a typo'd target.
+const DEFAULT_MAX_TRIES = 1 << 30;
+
+/// Synchronous grind — tests, and any caller happy to block. Throws once
+/// `maxTries` nonces have been tried without reaching `targetBits`; the worker
+/// (`pow-worker.ts`) is the non-blocking path and reports progress instead.
+export function grind(
+  challenge: Uint8Array,
+  targetBits: number,
+  maxTries = DEFAULT_MAX_TRIES,
+): number {
   const g = new Grinder(challenge, targetBits);
-  for (;;) {
+  while (g.tried < maxTries) {
     const hit = g.next(1 << 16);
     if (hit !== null) return hit;
   }
+  throw new Error(`no nonce reached ${targetBits} bits in ${maxTries.toLocaleString()} tries`);
 }

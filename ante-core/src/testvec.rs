@@ -1,13 +1,14 @@
 //! The canonical cross-implementation test vector.
 //!
 //! Both [`crate::proof`]'s `cbor_wire_format_is_pinned` test and
-//! `web/test/ante-proof.test.ts` pin the exact bytes this produces. It is the
-//! one place the Rust and TypeScript halves are held to the same wire format.
+//! `client/test/ante-proof.test.ts` pin the exact bytes this produces. It is
+//! the one place the Rust and TypeScript halves are held to the same wire
+//! format.
 //!
 //! To regenerate after a **deliberate** format change:
-//! `cargo run -p ante-core --example print_vector`, then paste the new
-//! `proof_cbor_hex` / `challenge_hex` into both pin sites. Any such change is
-//! breaking for every stored proof.
+//! `cargo run -p ante-core --example print_vector`, then
+//! paste the new `proof_cbor_hex` / `challenge_hex` into both pin sites. Any
+//! such change is breaking for every proof already stored anywhere.
 #![doc(hidden)]
 
 use ed25519_dalek::SigningKey;

@@ -1,8 +1,10 @@
 //! Prints the canonical cross-implementation test vector.
 //!
+//!   cargo run -p ante-core --example print_vector
+//!
 //! Run this after a deliberate wire-format change and paste the output into the
 //! two pin sites: `ante-core/src/proof.rs` (`cbor_wire_format_is_pinned`) and
-//! `web/test/ante-proof.test.ts` (`VECTOR`).
+//! `client/test/ante-proof.test.ts` (`VECTOR`).
 
 use ante_core::{pow, testvec, to_cbor};
 

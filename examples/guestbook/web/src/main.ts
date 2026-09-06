@@ -99,7 +99,7 @@ function render(shown: Shown[]) {
 
   for (const tier of TIERS) {
     const inTier = shown
-      .filter((s) => tierOf(s.bits).label === tier.label)
+      .filter((s) => tierOf(s.bits).min === tier.min)
       .sort((a, b) => b.entry.proof.ts - a.entry.proof.ts); // newest first
     if (inTier.length === 0) continue;
 

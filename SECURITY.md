@@ -22,11 +22,18 @@ In scope:
 
 - `ante-core` — the proof primitive and verifier (signature bypass, work
   overstatement, purpose-binding escape, CBOR parsing).
-- `ante-delegate` — key custody, the consent round-trip (prompt spoofing,
-  answering another origin's prompt, extracting the private key).
+- `ante-delegate` — key custody and the consent round-trip: prompt spoofing,
+  answering another origin's prompt, or reaching the identity seed **without**
+  the `ExportIdentity` prompt. Export and import deliberately move the seed, so
+  the bug class there is "the seed moved and the user was never asked", or "the
+  prompt described one action and a different one ran".
+- `@ante/client` — issuing `ExportIdentity` / `ImportIdentity` the user did not
+  initiate, or a recovery code that decodes to a key other than the fingerprint
+  shown next to it.
 - `contracts/ante-registry` — admitting an invalid or overstated proof,
   lowering a level, breaking convergence.
-- The web verifier (`web/src/ante-proof.ts`) drifting from `ante-core`.
+- The TypeScript verifier (`client/src/ante-proof.ts`) drifting from
+  `ante-core`.
 
 Out of scope (documented non-goals — see [DESIGN.md](DESIGN.md)):
 
@@ -35,10 +42,19 @@ Out of scope (documented non-goals — see [DESIGN.md](DESIGN.md)):
 - One person minting many identities (each costs the same).
 - Denial of service by flooding a contract with valid-but-cheap proofs — that
   is the consuming app's policy (`min_bits`, per-author caps).
+- Anything downstream of a leaked recovery code. It *is* the identity, by
+  design; the prompt before revealing it is the control.
+- Node-level secret storage. If the node's secret store or KEK is lost or
+  read by someone else, that is a Freenet/operator concern — ante's answer is
+  the recovery code, not a second layer of encryption.
 
 ## What "fixed" looks like
 
-A wire-format change to `AnteProof` is breaking for every stored proof, so a
-fix there ships as a new `purpose`/version rather than a silent reinterpret.
-The pin tests (`ante-core::proof::cbor_wire_format_is_pinned`,
-`web/test/ante-proof.test.ts`) are the tripwire.
+A wire-format change to `AnteProof` is breaking for every proof already stored
+anywhere, so a fix there ships as a new `purpose`/version rather than a silent
+reinterpret. The pin tests (`ante-core::proof::cbor_wire_format_is_pinned`,
+`client/test/ante-proof.test.ts`) are the tripwire.
+
+A fix inside the delegate re-keys it (`blake3(wasm)`), which strands every
+identity stored under the old key. Users must be told to save their recovery
+code *before* upgrading; the release note is part of the fix.

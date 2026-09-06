@@ -1,0 +1,13 @@
+# The delegate's identity, as a committed fact. GENERATED — update it only by
+# running: ANTE_ACCEPT_REKEY=1 ./scripts/check-delegate-key.sh
+#
+# `key` is the namespace every user's ante identity lives under on their node.
+# When it changes, those identities become unreachable and each user has to
+# restore from their recovery code (AnteClient.exportIdentity / importIdentity).
+#
+# It changes on ANY change to the delegate's compiled bytes — including an edit
+# to ante-core that only shifts a line number above a `panic!`, because
+# `line!()` is baked into the binary. Treat a diff here as a breaking change:
+# say so in the release notes and tell users to save their recovery code first.
+code_hash = "92372684b18ad42d7762138351eeab49344cd378c0b3f39da1a4b23603b05d94"
+key = "3631e9328860295d00526b3ee1535bce5c5f6bf8afe3aa2624aff5e36b074915"

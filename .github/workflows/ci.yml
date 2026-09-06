@@ -47,6 +47,30 @@ jobs:
       - name: build the delegate + embed it
         run: ./scripts/sync-delegate.sh
 
+      # A re-key strands every identity stored under the old key, and it takes
+      # as little as a shifted line above a panic! in ante-core to cause one
+      # (`line!()` is baked into the binary). The key is a committed fact, so
+      # moving it has to be a deliberate, reviewable act.
+      - name: the delegate key matches its committed record
+        run: ./scripts/check-delegate-key.sh
+
+      # The delegate key is blake3(wasm), and it is the namespace every user's
+      # identity is stored under: a build that is not byte-stable silently
+      # strands identities on every rebuild. Prove it here rather than finding
+      # out in production.
+      - name: the delegate build is byte-reproducible
+        run: |
+          first=$(sha256sum ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm | cut -d' ' -f1)
+          rm -rf ante-delegate/target/wasm32-unknown-unknown
+          ./scripts/build-delegate.sh >/dev/null
+          second=$(sha256sum ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm | cut -d' ' -f1)
+          echo "1: $first"
+          echo "2: $second"
+          [ "$first" = "$second" ] || {
+            echo "::error::the delegate WASM is not byte-reproducible — its key, and every stored identity, would move on rebuild" >&2
+            exit 1
+          }
+
       - name: build the contract WASMs (reproducible)
         run: |
           (cd contracts/ante-registry && ../../scripts/build-contract.sh)
