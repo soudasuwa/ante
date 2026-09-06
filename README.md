@@ -21,6 +21,9 @@ every design decision and the reasoning behind it, exact wire formats, the
 failure modes we hit, the threat model, and what we would do next. Written to
 be enough to rebuild the system from.
 
+🌐 **[DEPLOYMENTS.md](DEPLOYMENTS.md)** — what is live on Freenet: the two
+web-app URLs, the published contract instances, and the delegate key record.
+
 ## Layout
 
 ```
