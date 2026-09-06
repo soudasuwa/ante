@@ -1,0 +1,37 @@
+[package]
+name = "ante-guestbook-example"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Reference: a Freenet guestbook contract that requires an ante proof per entry."
+
+# Own workspace root: fdev's workspace walk stops here and the crate keeps its
+# own Cargo.lock, so a workspace `cargo update` cannot change its WASM bytes.
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["freenet-main-contract"]
+freenet-main-contract = []
+
+[dependencies]
+# The consuming side links only this — no delegate, no key custody. It pulls
+# ed25519/blake3/serde transitively, which is all a verifier needs.
+ante-core = { path = "../../ante-core" }
+freenet-stdlib = { version = "=0.8.5", features = ["contract"] }
+serde = { version = "1", features = ["derive"] }
+ciborium = "0.2"
+blake3 = "1"
+
+[dev-dependencies]
+ed25519-dalek = { version = "2.1", features = ["serde"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

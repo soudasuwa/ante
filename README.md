@@ -20,7 +20,10 @@ Verifying is one blake3 hash and one signature check.
 ante-core/      the primitive + AnteProof + verify  (no freenet-stdlib dependency)
 ante-delegate/  the Freenet delegate: key custody + consent prompt + signing (→ WASM)
 web/            identity-management UI: create an identity, grind bits, hold proofs
-scripts/        build-delegate.sh — the one canonical WASM build
+tools/          delegate-key: compute a delegate's address from its WASM
+scripts/        build-delegate.sh, sync-delegate.sh
+examples/
+  guestbook-contract/   a Freenet contract that requires an ante proof per entry
 ```
 
 ## Status
