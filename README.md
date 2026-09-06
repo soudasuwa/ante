@@ -50,10 +50,11 @@ app gets an `AnteProof` per action, ground on demand. The identity has a
 recovery code (`ExportIdentity` / `ImportIdentity`), so it survives a node
 whose secret store is wiped.
 
-**Phase 2** (contract done; UI wiring + publish pending) — `ante-core::registry`
-and `contracts/ante-registry/`: an identity publishes its level once, and an
-app reads it with a plain contract GET (`RegistryState::level(vk)`) instead of
-triggering a grind. Monotonic — you raise your level, never lower it.
+**Phase 2** (published, live) — `ante-core::registry` and
+`contracts/ante-registry/`: an identity publishes its level once, and an app
+reads it with a plain contract GET (`RegistryState::level(vk)`) instead of
+triggering a grind. Monotonic — you raise your level, never lower it. The live
+instance is in [DEPLOYMENTS.md](DEPLOYMENTS.md).
 
 ## Verifying a proof (consumer side)
 
