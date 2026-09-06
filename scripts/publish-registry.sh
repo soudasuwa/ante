@@ -19,8 +19,8 @@ command -v fdev >/dev/null || {
   exit 1
 }
 
-echo "building the contract WASM…"
-(cd "$CONTRACT_DIR" && cargo build --release --target wasm32-unknown-unknown)
+echo "building the contract WASM (reproducible)…"
+(cd "$CONTRACT_DIR" && "$REPO_ROOT/scripts/build-contract.sh")
 WASM="$CONTRACT_DIR/target/wasm32-unknown-unknown/release/ante_registry_contract.wasm"
 
 PARAMS="$(mktemp)"

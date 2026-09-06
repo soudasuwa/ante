@@ -15,6 +15,12 @@
 #      to a fixed placeholder so a laptop and a CI runner agree.
 #
 # `-Ztrim-paths` would be tidier but is not stable. Remap by hand.
+#
+# NOT run through wasm-opt: it is deterministic only for a fixed version, and
+# "is binaryen installed, which version" is exactly the machine dependency the
+# delegate key must not have. The ~50 KB it would save is not worth a key that
+# splits by toolchain. If size ever matters, pin a wasm-opt version and make it
+# a required step, not an optional one.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,13 +36,6 @@ export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$CARGO_HOME_DIR/registry/sr
 cargo build --target wasm32-unknown-unknown --release "$@"
 
 WASM="target/wasm32-unknown-unknown/release/ante_delegate.wasm"
-
-# Optional size pass. wasm-opt is not required for correctness, but the
-# published artifact should be run through it; skip quietly if absent.
-if command -v wasm-opt >/dev/null 2>&1; then
-    wasm-opt -Oz --enable-bulk-memory -o "$WASM.opt" "$WASM"
-    mv "$WASM.opt" "$WASM"
-fi
 
 echo "wasm: $WASM ($(wc -c < "$WASM") bytes)"
 if command -v b3sum >/dev/null 2>&1; then

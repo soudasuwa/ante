@@ -23,9 +23,8 @@ cargo build --target wasm32-unknown-unknown --release "$@"
 WASM="$(find target/wasm32-unknown-unknown/release -maxdepth 1 -name '*.wasm' -print -quit)"
 [ -n "$WASM" ] || { echo "no .wasm produced" >&2; exit 1; }
 
-if command -v wasm-opt >/dev/null 2>&1; then
-  wasm-opt -Oz --enable-bulk-memory -o "$WASM.opt" "$WASM" && mv "$WASM.opt" "$WASM"
-fi
+# No wasm-opt: a contract's address is its bytes, and "which binaryen version"
+# is a machine dependency the address must not carry. See build-delegate.sh.
 
 echo "wasm: $WASM ($(wc -c < "$WASM") bytes)"
 command -v b3sum >/dev/null 2>&1 && echo "code_hash: $(b3sum --no-names "$WASM")"
