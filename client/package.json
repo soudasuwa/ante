@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "prepare": "node -e \"const fs=require('fs'),f='src/embedded.ts';fs.existsSync(f)||fs.copyFileSync('src/embedded.stub.ts',f)\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

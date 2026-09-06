@@ -22,7 +22,7 @@ import {
 
 /// The published guestbook contract instance. Fill this in after
 /// `scripts/publish-guestbook.sh` prints the id, or pass `?contract=<id>`.
-const GUESTBOOK_CONTRACT_ID = "";
+const GUESTBOOK_CONTRACT_ID = "Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9";
 
 /// Must match the parameters the contract was published with
 /// (`ANTE_GUESTBOOK_PURPOSE` / `ANTE_GUESTBOOK_MIN_BITS` in the publish script).
@@ -63,8 +63,11 @@ export class Guestbook {
   /// Read every entry from contract state. The contract stores them in a
   /// `BTreeMap` keyed by a content hash; the client only cares about the values.
   async entries(): Promise<Entry[]> {
-    const state = cborDecode(await this.fn.getContractState(this.key));
-    const map = mapGet(state, "entries");
+    const bytes = await this.fn.getContractState(this.key);
+    // A contract with no updates yet has empty state (the Rust side maps that
+    // to GuestbookState::default()). Nothing to decode.
+    if (bytes.length === 0) return [];
+    const map = mapGet(cborDecode(bytes), "entries");
     if (!(map instanceof Map)) return [];
     return [...map.values()].map(decodeEntry);
   }

@@ -2,8 +2,8 @@
 // plain contract GET; publish a proof with a delta update. The CRDT lives in
 // `ante_core::registry`; this only reads and writes its CBOR.
 
-import { decodeAnteProof, verifyAnteProof } from "./ante-proof";
-import { asBytes, cborDecode, cborEncode, CborValue, mapGet } from "./cbor";
+import { decodeAnteProofValue, verifyAnteProof } from "./ante-proof";
+import { asBytes, cborDecode, cborEncode, mapGet } from "./cbor";
 import { ANTE_REGISTRY_CONTRACT_ID } from "./embedded";
 import { contractKeyFromId, FreenetClient } from "./freenet";
 import { bytesEqual } from "./util";
@@ -33,8 +33,7 @@ export class RegistryClient {
 
     for (const [k, v] of levels) {
       if (bytesEqual(asBytes(k), identityVk)) {
-        const proof = decodeAnteProof(cborEncode(v as CborValue));
-        const result = verifyAnteProof(proof, 0);
+        const result = verifyAnteProof(decodeAnteProofValue(v), 0);
         return result.ok ? result.bits : null;
       }
     }

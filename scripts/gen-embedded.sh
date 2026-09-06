@@ -4,9 +4,12 @@
 #
 #   gen-embedded.sh <delegate.wasm> [<registry-instance-id>]
 #
-# If the registry id is omitted, the one currently in embedded.ts is kept. The
-# generated file is what @ante/client uses at runtime; a fresh checkout ships a
-# placeholder so `tsc` / `vitest` pass without a build.
+# If the registry id is omitted, the one currently in embedded.ts is kept.
+#
+# embedded.ts is gitignored — it holds a ~370 KB base64 blob that re-keys on
+# every delegate change. A fresh checkout has none until `npm install` copies
+# embedded.stub.ts over (the `prepare` script), which is enough for `tsc` /
+# `vitest`; this script writes the real one.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

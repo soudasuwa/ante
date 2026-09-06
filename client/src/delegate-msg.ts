@@ -38,9 +38,10 @@ export function base64ToBytes(b64: string): Uint8Array {
 
 /// Register the delegate's WASM on the connected node. Delegates never
 /// propagate over the network, so every user's node must be handed the bytes
-/// by the UI. Registration is idempotent. Resolves with the delegate key from
-/// the ack (the node recomputes it from code+params; the key fields sent here
-/// are required by the schema but not trusted).
+/// by the UI. Registration is idempotent — re-registering the same bytes does
+/// not touch the delegate's stored secrets. Resolves with the delegate key
+/// from the ack (the node recomputes it from code+params; the key fields sent
+/// here are required by the schema but not trusted).
 export async function registerDelegate(
   client: FreenetClient,
   address: DelegateAddress,
@@ -52,10 +53,13 @@ export async function registerDelegate(
     DelegateType.WasmDelegateV1,
     new WasmDelegateV1T([], code, key),
   );
-  const cipher = new Uint8Array(32);
-  const nonce = new Uint8Array(24);
-  crypto.getRandomValues(cipher);
-  crypto.getRandomValues(nonce);
+  // `cipher`/`nonce` are required by the FlatBuffers schema but the node
+  // ignores them (since freenet-core #4140 the per-delegate key is derived
+  // from the node's own KEK). Send a stable value keyed to the delegate — a
+  // random one per call would strand secrets on any node that still honours
+  // the field.
+  const cipher = address.keyBytes.slice(0, 32);
+  const nonce = address.codeHashBytes.slice(0, 24);
   const register = new RegisterDelegateT(container, Array.from(cipher), Array.from(nonce));
   const delegateReq = new DelegateRequest(DelegateRequestType.RegisterDelegate, register);
   const clientReq = new ClientRequestT(ClientRequestType.DelegateRequest, delegateReq);
