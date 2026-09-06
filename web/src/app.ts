@@ -25,6 +25,7 @@ import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
 import { RegistryClient, registryConfigured } from "./registry";
 import {
   forgetHeldProof,
+  heldProofsPersist,
   loadHeldProofs,
   proofCborFromHex,
   proofCborToHex,
@@ -115,7 +116,7 @@ function renderLevel() {
   const best = loadHeldProofs()
     .filter((p) => p.purpose === IDENTITY_LEVEL_PURPOSE)
     .reduce((max, p) => Math.max(max, p.bits), 0);
-  $("id-level").textContent = best > 0 ? `${best} bits` : "none yet";
+  $("id-level").textContent = best > 0 ? `${best} bits (this session)` : "none this session";
 }
 
 async function refreshRegistryLevel() {
@@ -242,9 +243,13 @@ async function runGrindPanel(opts: {
 function renderHeld() {
   const list = $("held-list");
   const held = loadHeldProofs();
+  const note = $("held-note");
+  note.textContent = heldProofsPersist()
+    ? ""
+    : "This list is held in memory only (the gateway sandbox blocks storage) — it clears on reload. Identity-level proofs are safe on the registry regardless.";
   list.innerHTML = "";
   if (held.length === 0) {
-    list.innerHTML = `<li class="muted">none yet</li>`;
+    list.innerHTML = `<li class="muted">nothing signed yet this session</li>`;
     return;
   }
   for (const p of held) {

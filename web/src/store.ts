@@ -1,6 +1,14 @@
-// Phase 1 has no registry contract, so the proofs a user makes live in
-// localStorage — a convenience, not a source of truth. Phase 2's registry
-// replaces this.
+// A record of proofs signed in this browser session.
+//
+// The gateway serves the webapp in an opaque-origin sandbox iframe, where
+// `localStorage` is unavailable (a `SecurityError` on access). So the session
+// list is held in memory — visible and copyable while the tab is open, gone on
+// refresh. `localStorage` is still used opportunistically: outside the sandbox
+// (`vite dev`, or a future non-iframe host) it persists across reloads.
+//
+// The durable record of an *identity-level* proof is the registry contract,
+// not this. Per-action proofs are ephemeral by design — the app you commit for
+// receives the proof and owns it from there.
 
 import { bytesToHex, hexToBytes } from "./util";
 
@@ -12,37 +20,51 @@ export interface HeldProof {
 }
 
 const KEY = "ante:held-proofs:v1";
+const MAX = 50;
 
-export function loadHeldProofs(): HeldProof[] {
+let session: HeldProof[] = hydrate();
+
+function hydrate(): HeldProof[] {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as HeldProof[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? (parsed as HeldProof[]) : [];
   } catch {
     return [];
   }
 }
 
-export function saveHeldProof(entry: HeldProof): void {
+function persist(): void {
   try {
-    const all = loadHeldProofs().filter((p) => p.proofCborHex !== entry.proofCborHex);
-    all.unshift(entry);
-    localStorage.setItem(KEY, JSON.stringify(all.slice(0, 50)));
+    localStorage.setItem(KEY, JSON.stringify(session));
   } catch {
-    // A private window or blocked storage — the proof was still returned to
-    // the caller; only the local history is lost.
+    // Sandbox / private window — the in-memory list is still authoritative.
   }
 }
 
+export function loadHeldProofs(): HeldProof[] {
+  return session;
+}
+
+export function saveHeldProof(entry: HeldProof): void {
+  session = [entry, ...session.filter((p) => p.proofCborHex !== entry.proofCborHex)].slice(0, MAX);
+  persist();
+}
+
 export function forgetHeldProof(proofCborHex: string): void {
+  session = session.filter((p) => p.proofCborHex !== proofCborHex);
+  persist();
+}
+
+/// True when the list will survive a page reload (i.e. `localStorage` works).
+export function heldProofsPersist(): boolean {
   try {
-    localStorage.setItem(
-      KEY,
-      JSON.stringify(loadHeldProofs().filter((p) => p.proofCborHex !== proofCborHex)),
-    );
+    const probe = "ante:probe";
+    localStorage.setItem(probe, "1");
+    localStorage.removeItem(probe);
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
 
