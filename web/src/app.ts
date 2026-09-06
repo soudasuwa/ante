@@ -17,6 +17,10 @@ import {
   delegateIsBuilt,
 } from "./delegate-wasm";
 import { FreenetClient } from "./freenet";
+// Inlined as a blob: worker. A separate-file worker can't load in the gateway's
+// opaque-origin sandbox iframe (not same-origin with anything); the sandbox CSP
+// allows `blob:`, so an inlined worker is the portable form.
+import PowWorker from "./pow-worker?worker&inline";
 import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
 import { RegistryClient, registryConfigured } from "./registry";
 import {
@@ -139,7 +143,7 @@ function grindInWorker(
   onProgress: (tried: number, hps: number) => void,
 ): Promise<number> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./pow-worker.ts", import.meta.url), { type: "module" });
+    const worker = new PowWorker();
     const started = performance.now();
     worker.onmessage = (event: MessageEvent<PowWorkerMessage>) => {
       const msg = event.data;
@@ -254,8 +258,8 @@ function renderHeld() {
         <button data-act="check">check</button>
         <button data-act="forget" class="ghost">forget</button>
       </div>`;
-    li.querySelector('[data-act="copy"]')!.addEventListener("click", () => {
-      void navigator.clipboard?.writeText(p.proofCborHex);
+    li.querySelector('[data-act="copy"]')!.addEventListener("click", (e) => {
+      copyText(p.proofCborHex, e.currentTarget as HTMLButtonElement);
     });
     li.querySelector('[data-act="check"]')!.addEventListener("click", () => {
       ($("verify-input") as HTMLTextAreaElement).value = p.proofCborHex;
@@ -335,9 +339,42 @@ function wireStaticHandlers() {
   document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const el = document.getElementById(btn.dataset.copy!);
-      if (el?.textContent) void navigator.clipboard?.writeText(el.textContent);
+      if (el?.textContent) copyText(el.textContent, btn);
     });
   });
+}
+
+/// Copy to clipboard, with a fallback for the gateway sandbox (where the
+/// Clipboard API is often not granted): select the source text so the user can
+/// hit Ctrl+C, and flash the button label.
+function copyText(text: string, btn: HTMLButtonElement) {
+  const flash = (label: string) => {
+    const prev = btn.textContent;
+    btn.textContent = label;
+    setTimeout(() => (btn.textContent = prev), 1200);
+  };
+  navigator.clipboard?.writeText(text).then(
+    () => flash("copied"),
+    () => selectInto(text, flash),
+  );
+  if (!navigator.clipboard) selectInto(text, flash);
+}
+
+function selectInto(text: string, flash: (label: string) => void) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  flash(ok ? "copied" : "select + ⌘/Ctrl-C");
 }
 
 function escapeHtml(s: string): string {
