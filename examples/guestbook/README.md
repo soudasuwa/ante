@@ -130,6 +130,17 @@ fdev website init guestbook            # one-time; back up the key file
 fdev website update examples/guestbook/web/dist --key guestbook
 ```
 
+This gives you **two ids, and they are not interchangeable**:
+
+- the **website** id (from `fdev website`) — the page you open at
+  `<node>/v1/contract/web/<id>/`;
+- the **contract** id (from `publish-guestbook.sh`) — the entries, which the
+  page reads over the node's WebSocket API.
+
+Opening the contract id as a web URL fails with `failed unpacking contract`:
+the gateway is trying to unzip CBOR state as a site. The live ids for both are
+in [DEPLOYMENTS.md](../../DEPLOYMENTS.md).
+
 ## What ante does and does not do here
 
 **Does:** make each post cost a measurable, verifiable slice of CPU bound to one

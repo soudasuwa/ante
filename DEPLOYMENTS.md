@@ -7,28 +7,45 @@ from. A row changing means a re-key — see [DESIGN.md](DESIGN.md#before-v02-upg
 for what that costs and [WHITEPAPER.md](WHITEPAPER.md) §12 for why it happens so
 easily.
 
-## Web apps
+> **Two kinds of id live below, and only one of them is a URL.** A *website*
+> contract holds a site you can open in a browser. A *data* contract holds
+> application state — opening one at `/v1/contract/web/…` fails with
+> `failed unpacking contract`, because the gateway is trying to unzip CBOR.
 
-Published with `fdev website`, whose URL is `blake3(container_wasm ‖ publisher_key)`.
-Neither input contains the site content, so **these URLs are permanent and
-updated in place**. The publisher key lives in
-`~/.config/freenet/website-keys/<name>.toml` — **back those files up; losing one
-means that URL can never be updated again.**
+## Open these
 
-| Site | Key name | Contract | Publish |
-|---|---|---|---|
-| Identity UI (`web/`) | `ante` | `AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r` | `./scripts/publish-web.sh` |
-| Guestbook example | `guestbook` | `HLqqoWvQZMRy1JF9g1DV34VUeagCzgGvC4mNepSC6WWV` | `npm run build --workspace ante-guestbook-web && fdev website update ./examples/guestbook/web/dist --key guestbook` |
+Published with `fdev website`, whose contract key is
+`blake3(container_wasm ‖ publisher_key)`. Neither input contains the site
+content, so **these URLs are permanent and updated in place**. The publisher key
+lives in `~/.config/freenet/website-keys/<name>.toml` — **back those files up;
+losing one means that URL can never be updated again.**
 
-Reach either at `<node>/v1/contract/web/<contract>/` — e.g.
-`http://127.0.0.1:7509/v1/contract/web/AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r/`.
+| Site | Key name | URL (on a node at `127.0.0.1:7509`) |
+|---|---|---|
+| Identity UI (`web/`) | `ante` | <http://127.0.0.1:7509/v1/contract/web/AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r/> |
+| Guestbook example | `guestbook` | <http://127.0.0.1:7509/v1/contract/web/HLqqoWvQZMRy1JF9g1DV34VUeagCzgGvC4mNepSC6WWV/> |
 
-## Contracts
+Republish with:
+
+```bash
+./scripts/publish-web.sh                       # identity UI
+npm run build --workspace ante-guestbook-web \
+  && fdev website update ./examples/guestbook/web/dist --key guestbook
+```
+
+## Do not open these
+
+State, not sites. Apps reach them with a contract GET/UPDATE over the node's
+WebSocket API; there is nothing to render.
 
 | Contract | Instance | Parameters | Publish |
 |---|---|---|---|
 | ante-registry | `E8jXsQgvKkn1kzEpSDFwDRUbqZW3Tc1Z7BtmXQwyfb1J` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
 | guestbook example | `Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
+
+The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`Fw691…`).
+Two different ids for one example — that is the normal shape of a Freenet app,
+not a quirk of this one.
 
 The registry id is written into the generated `client/src/embedded.ts`, which is
 gitignored — so **this table is the only committed record of it**. After a fresh
