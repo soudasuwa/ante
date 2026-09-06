@@ -43,6 +43,9 @@ pub mod pow;
 pub mod proof;
 pub mod protocol;
 
+#[doc(hidden)]
+pub mod testvec;
+
 pub use proof::{fingerprint, AnteProof, VerifyError};
 pub use protocol::{AnteRequest, AnteResponse};
 

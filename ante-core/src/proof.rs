@@ -167,6 +167,37 @@ mod tests {
         assert_eq!(proof.verify(8), Ok(bits));
     }
 
+    /// The wire format every stored proof and every third-party verifier
+    /// depends on. If this fails after a deliberate serde/layout change:
+    /// `cargo run -p ante-core --example print_vector`, paste the new hex
+    /// here AND into `web/test/ante-proof.test.ts`, and treat it as a
+    /// breaking change for every proof already in the wild.
+    #[test]
+    fn cbor_wire_format_is_pinned() {
+        let proof = crate::testvec::proof();
+        assert_eq!(
+            crate::testvec::hex(&crate::to_cbor(&proof)),
+            "a56b6964656e746974795f766b98201819187f186b182318e1186c1885183218c618ab18c8183818fa\
+             18cd185e18a7188918be0c187618b2189203183403189b18fa188b183d1836188d18616770757270\
+             6f736576616e74653a6964656e746974792d6c6576656c3a7631656e6f6e6365198b196274731b00\
+             000191dd9dec00697369676e6174757265984018f6188b07189c18d5182b184518e8187f185e1871\
+             18a418e618cc189e18ff1897185f189e1838188018ef186d1860188f18c50f18de18e618f118de18\
+             6e189d186518510f1834182f189a1869189e0d18d0185a18cc189a188418ad14184b187e184a18bc\
+             186e1858121872189718ea18ad182718e418970a"
+        );
+    }
+
+    /// The challenge layout the grinder (JS or Rust) hashes against.
+    #[test]
+    fn challenge_bytes_are_pinned() {
+        let vk = crate::testvec::verifying_key();
+        assert_eq!(
+            crate::testvec::hex(&pow::challenge_bytes(crate::testvec::PURPOSE, &vk)),
+            "616e74653a706f772d6368616c6c656e67653a763116000000616e74653a6964656e746974792d6c65\
+             76656c3a7631197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
+        );
+    }
+
     #[test]
     fn insufficient_work_is_rejected_without_touching_the_signature() {
         let k = key(2);
