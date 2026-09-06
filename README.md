@@ -24,11 +24,13 @@ ante-core/      the primitive + AnteProof + verify + the registry CRDT
 ante-delegate/  the Freenet delegate: key custody + consent prompt + signing (→ WASM)
 contracts/
   ante-registry/        records each identity's best identity-level proof (→ WASM)
+client/         @ante/client — the delegate embedded + a 2-line API an app calls
+                (AnteClient.attach → ante.commit(purpose)); the TS PoW + verifier
 web/            identity-management UI: create an identity, grind bits, hold proofs
 tools/          delegate-key: compute a delegate's address from its WASM
-scripts/        build-delegate.sh, sync-delegate.sh
+scripts/        build-delegate.sh, sync-delegate.sh, build-contract.sh
 examples/
-  guestbook-contract/   a Freenet contract that requires an ante proof per entry
+  guestbook/    a standalone Freenet app showing how to integrate @ante/client
 ```
 
 ## Status
@@ -62,16 +64,19 @@ cargo test --workspace                   # ante-core + tools
 (cd contracts/ante-registry && cargo test)
 
 rustup target add wasm32-unknown-unknown # once
-./scripts/sync-delegate.sh               # build the delegate WASM -> web/.gen/
+./scripts/sync-delegate.sh               # build the delegate WASM -> client/src/embedded.ts
 
-cd web && npm install
+npm install                              # workspaces: client + web
 npm test                                 # cross-impl guard (TS verifier vs a Rust vector)
-npm run dev                              # the UI, against your local node
+npm run dev --workspace web              # the UI, against your local node
 ```
 
 `npm run dev` serves on its own origin, so pass your node with a query param:
 `http://localhost:5173/?node=127.0.0.1:7509`. Served through the node's gateway
 it needs no param.
+
+An app integrates ante through the `@ante/client` package — never by talking to
+the delegate directly. See [examples/guestbook/](examples/guestbook/).
 
 ### Phase 2: the registry
 
@@ -79,8 +84,8 @@ Optional — the UI works without it, showing only the local best level.
 
 ```bash
 # fdev: install from https://freenet.org/install.sh  (cargo install fdev needs rustc >= 1.94)
-./scripts/publish-registry.sh            # build, publish, write web/.gen/registry_contract_id.txt
-cd web && npm run build                  # or restart `npm run dev` to pick up the id
+./scripts/publish-registry.sh            # build, publish, write the id into client/src/embedded.ts
+npm run build --workspace web            # or restart `npm run dev` to pick up the id
 ```
 
 Once configured, the "Strengthen your identity" panel publishes each proof to

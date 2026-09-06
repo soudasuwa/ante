@@ -1,0 +1,27 @@
+{
+  "name": "@ante/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser client for ante — register the delegate, grind, commit, verify.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@freenetorg/freenet-stdlib": "^0.2.0"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.0.0",
+    "@noble/hashes": "^2.0.0"
+  },
+  "devDependencies": {
+    "@freenetorg/freenet-stdlib": "^0.2.0",
+    "typescript": "^5.6",
+    "vite": "^6.0",
+    "vitest": "^2.1"
+  }
+}

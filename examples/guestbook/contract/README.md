@@ -1,9 +1,8 @@
-# ante-guestbook-example
+# ante-guestbook-contract
 
-A reference Freenet contract that requires an [`AnteProof`](../../ante-core)
-per guestbook entry. **Not published** — it exists to show `AnteProof::verify`
-in a real `validate_state` / `update_state`, and as groundwork for the Phase 2
-registry contract.
+The Freenet contract behind the [guestbook example](../). It requires an
+[`AnteProof`](../../../ante-core) per entry. **Not published** — it exists to
+show `AnteProof::verify` in a real `validate_state` / `update_state`.
 
 ## What it demonstrates
 
@@ -26,6 +25,6 @@ more. ante is the floor, not the ceiling.
 ## Build / test
 
 ```bash
-cargo test                                        # 9 tests, native
+cargo test                                        # native
 cargo build --release --target wasm32-unknown-unknown
 ```

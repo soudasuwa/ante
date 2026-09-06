@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ante-guestbook-example"
+name = "ante-guestbook-contract"
 version = "0.1.0"
 dependencies = [
  "ante-core",

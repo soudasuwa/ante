@@ -24,29 +24,14 @@ jobs:
           cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace
 
-      # The delegate and the example contract are separate crates (own
-      # Cargo.lock) so a workspace `cargo update` cannot re-key them. Check
-      # each on its own.
-      - name: ante-delegate — fmt / clippy / test
-        working-directory: ante-delegate
+      # The delegate and the contracts are separate crates (own Cargo.lock) so
+      # a workspace `cargo update` cannot re-key them. Check each on its own.
+      - name: standalone crates — fmt / clippy / test
         run: |
-          cargo fmt --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test
-
-      - name: guestbook example — fmt / clippy / test
-        working-directory: examples/guestbook-contract
-        run: |
-          cargo fmt --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test
-
-      - name: ante-registry contract — fmt / clippy / test
-        working-directory: contracts/ante-registry
-        run: |
-          cargo fmt --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test
+          for d in ante-delegate contracts/ante-registry examples/guestbook/contract; do
+            echo "== $d =="
+            (cd "$d" && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test)
+          done
 
   wasm:
     runs-on: ubuntu-latest
@@ -57,33 +42,41 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
 
-      # build-delegate.sh also greps the WASM for absolute registry paths and
-      # fails if any leaked — the reproducibility guard.
-      - name: build the delegate WASM (with the reproducibility check)
-        run: ./scripts/build-delegate.sh
+      # build-delegate.sh greps the WASM for absolute registry paths and fails
+      # if any leaked — the reproducibility guard. Then regenerate embedded.ts.
+      - name: build the delegate + embed it
+        run: ./scripts/sync-delegate.sh
 
-      - name: build the example + registry contract WASM
+      - name: build the contract WASMs (reproducible)
         run: |
-          (cd examples/guestbook-contract && cargo build --release --target wasm32-unknown-unknown)
-          (cd contracts/ante-registry && cargo build --release --target wasm32-unknown-unknown)
+          (cd contracts/ante-registry && ../../scripts/build-contract.sh)
+          (cd examples/guestbook/contract && ../../../scripts/build-contract.sh)
+
+      - name: upload embedded.ts for the web job
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedded
+          path: client/src/embedded.ts
 
   web:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
+    needs: wasm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: embedded
+          path: client/src
 
       - run: npm ci
-      - name: typecheck
-        run: npx tsc --noEmit
+      - name: typecheck (all workspaces)
+        run: npm run typecheck
       - name: cross-impl guard (TS verifier vs the pinned Rust vector)
         run: npm test
-      - name: bundle build
+      - name: build the UIs
         run: npm run build

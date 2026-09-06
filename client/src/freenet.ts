@@ -1,5 +1,7 @@
-// Connection to the local Freenet node, trimmed to what ante needs: delegate
-// registration and delegate messaging. Adapted from FreePlace's freenet-api.ts.
+// Generic connection to the local Freenet node — the WebSocket, contract
+// GET/UPDATE, and a queue for delegate responses (which the stdlib TS API has
+// no promise for). Not ante-specific: any Freenet web app needs roughly this.
+// Adapted from FreePlace's freenet-api.ts.
 //
 // The WS URL follows the page location so the gateway-served app talks to
 // whatever node serves it. `?node=host:port` overrides it for `vite dev`,
@@ -81,6 +83,38 @@ export class FreenetClient {
 
   private failOldest(err: Error): void {
     this.pending.shift()?.reject(err);
+  }
+
+  /// Connect and resolve once the socket is open (or reject on timeout). Most
+  /// apps want this rather than juggling the `onOpen` callback.
+  static connect(events?: Partial<FreenetEvents>, openTimeoutMs = 8000): Promise<FreenetClient> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          reject(new Error("node did not accept the connection"));
+        }
+      }, openTimeoutMs);
+      const client = new FreenetClient({
+        onOpen: () => {
+          events?.onOpen?.();
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(client);
+          }
+        },
+        onClose: (code, reason) => {
+          events?.onClose?.(code, reason);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            reject(new Error(`connection closed: ${reason || code}`));
+          }
+        },
+      });
+    });
   }
 
   /// Read a contract's current state bytes. (Contract GET/UPDATE in stdlib TS

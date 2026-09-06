@@ -4,13 +4,11 @@
 
 import { decodeAnteProof, verifyAnteProof } from "./ante-proof";
 import { asBytes, cborDecode, cborEncode, CborValue, mapGet } from "./cbor";
+import { ANTE_REGISTRY_CONTRACT_ID } from "./embedded";
 import { contractKeyFromId, FreenetClient } from "./freenet";
 import { bytesEqual } from "./util";
 
-declare const __ANTE_REGISTRY_CONTRACT_ID__: string;
-
-/// The published registry instance id, or "" if none is configured yet.
-export const ANTE_REGISTRY_CONTRACT_ID: string = __ANTE_REGISTRY_CONTRACT_ID__;
+export { ANTE_REGISTRY_CONTRACT_ID } from "./embedded";
 
 export function registryConfigured(): boolean {
   return ANTE_REGISTRY_CONTRACT_ID.length > 0;

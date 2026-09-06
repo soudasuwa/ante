@@ -7,17 +7,14 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@freenetorg/freenet-stdlib": "^0.2.0",
-    "@noble/curves": "^2.0.0",
-    "@noble/hashes": "^2.0.0"
+    "@ante/client": "*",
+    "@freenetorg/freenet-stdlib": "^0.2.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
     "typescript": "^5.6",
-    "vite": "^6.0",
-    "vitest": "^2.1"
+    "vite": "^6.0"
   }
 }

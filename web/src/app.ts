@@ -1,28 +1,24 @@
 // The ante identity UI. One identity per user, held by the delegate; you raise
 // its level by grinding proof-of-work, and it's published to the registry so
-// any app can read it. Vanilla TS, one module.
+// any app can read it. All the ante plumbing is in @ante/client.
 
 import "./style.css";
 
-import { AnteClient } from "./ante-client";
-import { decodeAnteProof, fingerprint, IDENTITY_LEVEL_PURPOSE, verifyAnteProof } from "./ante-proof";
-import { base64ToBytes, registerDelegate, type DelegateAddress } from "./delegate-api";
 import {
-  ANTE_DELEGATE_CODE_HASH_BYTES,
-  ANTE_DELEGATE_KEY_BYTES,
-  ANTE_DELEGATE_WASM_B64,
-  delegateIsBuilt,
-} from "./delegate-wasm";
-import { FreenetClient } from "./freenet";
-// Inlined as a blob: worker — a separate-file worker can't load in the
-// gateway's opaque-origin sandbox iframe; the sandbox CSP allows blob:.
-import PowWorker from "./pow-worker?worker&inline";
-import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
-import { RegistryClient, registryConfigured } from "./registry";
-import { bytesToHex, hexToBytes } from "./util";
+  AnteClient,
+  decodeAnteProof,
+  fingerprint,
+  FreenetClient,
+  IDENTITY_LEVEL_PURPOSE,
+  RegistryClient,
+  registryConfigured,
+  verifyAnteProof,
+  bytesToHex,
+  hexToBytes,
+} from "@ante/client";
 
 /// Absolute ceiling on the grind target — past this a grind runs for many
-/// minutes and the slider is meaningless.
+/// minutes and the input is meaningless.
 const MAX_BITS = 32;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -33,10 +29,6 @@ let identityVk: Uint8Array | null = null;
 /// The identity's registry level, or null when it has none yet / unknown.
 let currentLevel: number | null = null;
 
-// --------------------------------------------------------------------------
-// boot
-// --------------------------------------------------------------------------
-
 function setConn(text: string, state: "ok" | "warn" | "err" | "") {
   const el = $("conn");
   el.textContent = text;
@@ -45,41 +37,15 @@ function setConn(text: string, state: "ok" | "warn" | "err" | "") {
 
 async function boot() {
   wireStaticHandlers();
-
-  if (!delegateIsBuilt()) {
-    setConn("the ante delegate is not built — run ./scripts/sync-delegate.sh, then reload", "err");
-    return;
-  }
-
-  const address: DelegateAddress = {
-    keyBytes: ANTE_DELEGATE_KEY_BYTES,
-    codeHashBytes: ANTE_DELEGATE_CODE_HASH_BYTES,
-  };
-
-  let markOpen: () => void = () => {};
-  const opened = new Promise<void>((resolve) => {
-    markOpen = resolve;
-  });
-  const client = new FreenetClient({
-    onOpen: () => {
-      setConn("connected — registering the delegate…", "ok");
-      markOpen();
-    },
-    onClose: (code, reason) => setConn(`connection closed: ${reason || code}`, "err"),
-  });
-
   try {
-    await Promise.race([
-      opened,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("node did not accept the connection")), 8000),
-      ),
-    ]);
-    await registerDelegate(client, address, base64ToBytes(ANTE_DELEGATE_WASM_B64));
-    ante = new AnteClient(client, address);
-    if (registryConfigured()) registry = new RegistryClient(client);
+    const fn = await FreenetClient.connect({
+      onClose: (code, reason) => setConn(`connection closed: ${reason || code}`, "err"),
+    });
+    setConn("connected — registering the ante delegate…", "ok");
+    ante = await AnteClient.attach(fn);
+    if (registryConfigured()) registry = new RegistryClient(fn);
 
-    identityVk = await ante.getIdentity();
+    identityVk = await ante.identity();
     $("id-fingerprint").textContent = fingerprint(identityVk);
     $("id-vk").textContent = bytesToHex(identityVk);
     $("identity-panel").hidden = false;
@@ -90,53 +56,6 @@ async function boot() {
     void refreshGrants();
   } catch (err) {
     setConn(`could not reach the delegate: ${(err as Error).message}`, "err");
-  }
-}
-
-// --------------------------------------------------------------------------
-// connected apps ("always allow" grants)
-// --------------------------------------------------------------------------
-
-const DEC = new TextDecoder();
-
-function grantLabel(tag: Uint8Array): string {
-  const s = DEC.decode(tag);
-  if (s.startsWith("webapp:")) return `app ${bytesToHex(tag.slice(7)).slice(0, 16)}…`;
-  if (s.startsWith("delegate:")) return `delegate ${bytesToHex(tag.slice(9)).slice(0, 16)}…`;
-  return s || "unknown";
-}
-
-async function refreshGrants() {
-  if (!ante) return;
-  let grants: Uint8Array[] = [];
-  try {
-    grants = await ante.listGrants();
-  } catch {
-    return;
-  }
-  const panel = $("grants-panel");
-  const list = $("grants-list");
-  panel.hidden = grants.length === 0;
-  list.innerHTML = "";
-  for (const tag of grants) {
-    const li = document.createElement("li");
-    li.className = "grant-row";
-    const name = document.createElement("code");
-    name.textContent = grantLabel(tag);
-    const revoke = document.createElement("button");
-    revoke.className = "ghost";
-    revoke.textContent = "revoke";
-    revoke.addEventListener("click", async () => {
-      revoke.disabled = true;
-      try {
-        await ante!.revokeGrant(tag);
-        await refreshGrants();
-      } catch (err) {
-        revoke.textContent = `failed: ${(err as Error).message}`;
-      }
-    });
-    li.append(name, revoke);
-    list.appendChild(li);
   }
 }
 
@@ -157,11 +76,7 @@ async function refreshLevel() {
 
 function renderLevel() {
   $("id-level").textContent =
-    currentLevel === null
-      ? registry
-        ? "unproven"
-        : "not tracked"
-      : `${currentLevel} bits`;
+    currentLevel === null ? (registry ? "unproven" : "not tracked") : `${currentLevel} bits`;
 
   const floor = (currentLevel ?? 0) + 1;
   const input = $("improve-bits") as HTMLInputElement;
@@ -176,48 +91,16 @@ function renderLevel() {
 
 function updateImproveLabel() {
   const n = Number(($("improve-bits") as HTMLInputElement).value) || 0;
-  $("improve-go").textContent = currentLevel === null ? `Prove identity — ${n} bits` : `Improve to ${n} bits`;
+  $("improve-go").textContent =
+    currentLevel === null ? `Prove identity — ${n} bits` : `Improve to ${n} bits`;
 }
 
-// --------------------------------------------------------------------------
-// grind
-// --------------------------------------------------------------------------
-
-function grind(
-  challenge: Uint8Array,
-  targetBits: number,
-  onProgress: (tried: number, hps: number) => void,
-): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const worker = new PowWorker();
-    const started = performance.now();
-    worker.onmessage = (event: MessageEvent<PowWorkerMessage>) => {
-      const msg = event.data;
-      const elapsed = (performance.now() - started) / 1000;
-      onProgress(msg.tried, elapsed > 0 ? msg.tried / elapsed : 0);
-      if (msg.type === "done") {
-        worker.terminate();
-        resolve(msg.nonce);
-      }
-    };
-    worker.onerror = (e) => {
-      worker.terminate();
-      reject(new Error(e.message || "grind worker failed"));
-    };
-    worker.postMessage({ challenge, targetBits } satisfies PowWorkerRequest);
-  });
-}
-
-function progressReporter(el: HTMLElement) {
+function gridProgress(el: HTMLElement) {
   el.hidden = false;
   return (tried: number, hps: number) => {
     el.textContent = `grinding — ${tried.toLocaleString()} hashes (${Math.round(hps).toLocaleString()}/s)`;
   };
 }
-
-// --------------------------------------------------------------------------
-// improve identity
-// --------------------------------------------------------------------------
 
 async function runImprove() {
   const btn = $("improve-go") as HTMLButtonElement;
@@ -228,14 +111,12 @@ async function runImprove() {
   btn.disabled = true;
   progress.hidden = false;
   try {
-    progress.textContent = "asking the delegate for the challenge…";
-    const challenge = await ante.challenge(IDENTITY_LEVEL_PURPOSE);
-
-    const nonce = await grind(challenge, target, progressReporter(progress));
-
-    progress.textContent = "grind done — approve the prompt on your node (you have 60 s)";
-    const outcome = await ante.commit(IDENTITY_LEVEL_PURPOSE, nonce, target, () => {
-      progress.textContent = "approve the prompt on your node (you have 60 s)…";
+    const outcome = await ante.commit(IDENTITY_LEVEL_PURPOSE, {
+      minBits: target,
+      onProgress: gridProgress(progress),
+      onPrompt: () => {
+        progress.textContent = "approve the prompt on your node (you have 60 s)…";
+      },
     });
     if (outcome.kind === "denied") {
       progress.textContent = "you declined the prompt — nothing was signed";
@@ -247,7 +128,7 @@ async function runImprove() {
 
     if (registry) {
       progress.textContent = `signed ${bits} bits — publishing to the registry…`;
-      await registry.publishProof(outcome.proofCbor);
+      await registry.publishProof(outcome.bytes);
     }
     currentLevel = Math.max(currentLevel ?? 0, bits);
     renderLevel();
@@ -284,29 +165,72 @@ async function runAction() {
   progress.hidden = false;
   result.hidden = true;
   try {
-    progress.textContent = "asking the delegate for the challenge…";
-    const challenge = await ante.challenge(purpose);
-
-    const nonce = await grind(challenge, target, progressReporter(progress));
-
-    progress.textContent = "grind done — approve the prompt on your node (you have 60 s)";
-    const outcome = await ante.commit(purpose, nonce, target, () => {
-      progress.textContent = "approve the prompt on your node (you have 60 s)…";
+    const outcome = await ante.commit(purpose, {
+      minBits: target,
+      onProgress: gridProgress(progress),
+      onPrompt: () => {
+        progress.textContent = "approve the prompt on your node (you have 60 s)…";
+      },
     });
     if (outcome.kind === "denied") {
       progress.textContent = "you declined the prompt — nothing was signed";
       return;
     }
-
     const v = verifyAnteProof(outcome.proof, 0);
     progress.textContent = `signed — ${v.ok ? v.bits : target} bits for "${purpose}"`;
-    ($("action-proof") as HTMLElement).textContent = bytesToHex(outcome.proofCbor);
+    ($("action-proof") as HTMLElement).textContent = bytesToHex(outcome.bytes);
     result.hidden = false;
     void refreshGrants();
   } catch (err) {
     progress.textContent = `failed: ${(err as Error).message}`;
   } finally {
     btn.disabled = false;
+  }
+}
+
+// --------------------------------------------------------------------------
+// connected apps ("always allow" grants)
+// --------------------------------------------------------------------------
+
+const DEC = new TextDecoder();
+
+function grantLabel(tag: Uint8Array): string {
+  const s = DEC.decode(tag);
+  if (s.startsWith("webapp:")) return `app ${bytesToHex(tag.slice(7)).slice(0, 16)}…`;
+  if (s.startsWith("delegate:")) return `delegate ${bytesToHex(tag.slice(9)).slice(0, 16)}…`;
+  return s || "unknown";
+}
+
+async function refreshGrants() {
+  if (!ante) return;
+  let grants: Uint8Array[] = [];
+  try {
+    grants = await ante.listGrants();
+  } catch {
+    return;
+  }
+  $("grants-panel").hidden = grants.length === 0;
+  const list = $("grants-list");
+  list.innerHTML = "";
+  for (const tag of grants) {
+    const li = document.createElement("li");
+    li.className = "grant-row";
+    const name = document.createElement("code");
+    name.textContent = grantLabel(tag);
+    const revoke = document.createElement("button");
+    revoke.className = "ghost";
+    revoke.textContent = "revoke";
+    revoke.addEventListener("click", async () => {
+      revoke.disabled = true;
+      try {
+        await ante!.revokeGrant(tag);
+        await refreshGrants();
+      } catch (err) {
+        revoke.textContent = `failed: ${(err as Error).message}`;
+      }
+    });
+    li.append(name, revoke);
+    list.appendChild(li);
   }
 }
 
@@ -352,8 +276,6 @@ function wireStaticHandlers() {
   });
 }
 
-/// Copy to clipboard; the gateway sandbox often doesn't grant the Clipboard
-/// API, so fall back to selecting the text and flashing the button.
 function copyText(text: string, btn: HTMLButtonElement) {
   const flash = (label: string) => {
     const prev = btn.textContent;
