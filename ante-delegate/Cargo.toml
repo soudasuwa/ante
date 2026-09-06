@@ -1,0 +1,49 @@
+[package]
+name = "ante-delegate"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/soudasuwa/ante"
+description = "Freenet delegate that custodies an ante identity key and signs proof-of-work commitments behind a consent prompt."
+publish = false
+
+# Empty stanza so this crate is its own workspace root: it keeps its own
+# Cargo.lock with pinned versions. The delegate key is derived from the WASM
+# bytes (`blake3(code_hash || params)`), so a silent dependency bump would
+# re-key the delegate and strand every stored identity.
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# The #[delegate] macro expands `cfg(feature = "trace")` from stdlib's feature
+# set into this crate; register it so `unexpected_cfgs` stays quiet.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("trace"))'] }
+
+[features]
+# The #[delegate] macro gates the WASM FFI exports behind this feature; without
+# it the built WASM has no entry points. Default-on for `cargo build`; the
+# native test build turns it off implicitly by testing the `rlib`.
+default = ["freenet-main-delegate"]
+freenet-main-delegate = []
+
+[dependencies]
+ante-core = { path = "../ante-core" }
+# "contract" gates the WASM guest support (memory helpers, host imports) the
+# #[delegate] macro needs — there is no separate "delegate" feature in 0.8.
+freenet-stdlib = { version = "=0.8.5", features = ["contract"] }
+ed25519-dalek = { version = "2.1", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ciborium = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release.package."*"]
+opt-level = "z"

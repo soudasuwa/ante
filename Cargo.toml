@@ -1,0 +1,23 @@
+[workspace]
+members = ["ante-core"]
+# The delegate is deliberately excluded: it keeps its own Cargo.lock with
+# pinned dependency versions so a workspace `cargo update` cannot silently
+# change its WASM bytes. The delegate key is derived from those bytes
+# (`blake3(code_hash || params)`), so an unintended dependency bump re-keys
+# the delegate and strands every stored identity.
+exclude = ["ante-delegate"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/soudasuwa/ante"
+
+[workspace.dependencies]
+ante-core = { path = "ante-core" }
+ed25519-dalek = { version = "2.1", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+ciborium = "0.2"
+blake3 = "1"
+bs58 = "0.5"

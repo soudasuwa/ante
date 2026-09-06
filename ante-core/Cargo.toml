@@ -1,0 +1,14 @@
+[package]
+name = "ante-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Proof-of-work identity commitments for Freenet apps: the shared primitive and verifier."
+
+[dependencies]
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+ciborium = { workspace = true }
+blake3 = { workspace = true }
+bs58 = { workspace = true }
