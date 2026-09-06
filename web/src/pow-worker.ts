@@ -1,7 +1,7 @@
-// Runs the grind off the main thread and reports progress so the UI can show
-// a live hash counter and an elapsed estimate.
+// Runs the grind off the main thread and reports progress so the UI can show a
+// live hash counter and rate.
 
-import { powBits } from "./pow";
+import { Grinder } from "./pow";
 
 export interface PowWorkerRequest {
   challenge: Uint8Array;
@@ -12,7 +12,7 @@ export type PowWorkerMessage =
   | { type: "progress"; tried: number }
   | { type: "done"; nonce: number; tried: number };
 
-const PROGRESS_EVERY = 4096;
+const BATCH = 4096;
 
 const scope = self as unknown as {
   onmessage: ((event: MessageEvent<PowWorkerRequest>) => void) | null;
@@ -21,14 +21,13 @@ const scope = self as unknown as {
 
 scope.onmessage = (event) => {
   const { challenge, targetBits } = event.data;
-  let nonce = 0;
+  const grinder = new Grinder(challenge, targetBits);
   for (;;) {
-    for (let i = 0; i < PROGRESS_EVERY; i++, nonce++) {
-      if (powBits(challenge, nonce) >= targetBits) {
-        scope.postMessage({ type: "done", nonce, tried: nonce + 1 });
-        return;
-      }
+    const hit = grinder.next(BATCH);
+    if (hit !== null) {
+      scope.postMessage({ type: "done", nonce: hit, tried: grinder.tried });
+      return;
     }
-    scope.postMessage({ type: "progress", tried: nonce });
+    scope.postMessage({ type: "progress", tried: grinder.tried });
   }
 };

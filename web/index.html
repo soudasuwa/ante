@@ -36,14 +36,15 @@
         </dl>
 
         <label>
-          Grind to
+          Grind to at least
           <input type="number" id="improve-bits" min="1" max="32" step="1" value="18" />
           bits
         </label>
         <p class="muted">
-          Each bit roughly doubles the work. ~18 is under a second; ~24 is a few
-          seconds; ~28 is tens of seconds. The registry only ever raises your
-          level, so aim above where you are.
+          Each extra bit roughly doubles the work (in your browser: ~18 a
+          second or two, ~20 around ten seconds, ~24 a minute or more). The
+          grind often clears a bit or two past your target — that's your real
+          level. The registry only ever raises it, so aim above where you are.
         </p>
         <button id="improve-go" class="primary">Prove identity</button>
         <p id="improve-progress" class="progress" hidden></p>
@@ -61,7 +62,7 @@
           <input type="text" id="action-purpose" placeholder="myapp:comment:v1" />
         </label>
         <label>
-          Grind to
+          Grind to at least
           <input type="number" id="action-bits" min="1" max="32" step="1" value="20" />
           bits
         </label>

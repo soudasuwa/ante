@@ -71,7 +71,7 @@ pub fn emit_prompt(
     let text = format!(
         "{caller} wants to spend proof of work on your ante identity {fingerprint}.\n\n\
          Purpose: {purpose}\n\
-         Work: about {achieved_bits} bits\n\n\
+         This proof demonstrates {achieved_bits} bits of work.\n\n\
          Approving signs a single one-off proof. Your key is never revealed, and \
          nothing ongoing is granted.\n\n\
          Allow, or deny?"
