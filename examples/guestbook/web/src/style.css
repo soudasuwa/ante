@@ -169,3 +169,40 @@ footer {
 footer a {
   color: var(--muted);
 }
+
+/* live grind readout */
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+#grind-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  background: #fbfaf8;
+}
+.grind-live {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.grind-live strong {
+  font-size: 1.15rem;
+}
+#grind-panel p {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+}
+button.ghost {
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.tier-effort {
+  float: right;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}

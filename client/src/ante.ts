@@ -19,6 +19,7 @@ import {
   type DelegateAddress,
 } from "./delegate-msg";
 import type { FreenetClient } from "./freenet";
+import type { Solution } from "./pow";
 import PowWorker from "./pow-worker?worker&inline";
 import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
 
@@ -49,6 +50,39 @@ export interface CommitOptions extends PromptOptions {
   minBits?: number;
   /// Called with (hashesTried, hashesPerSecond) during the grind.
   onProgress?: (tried: number, hps: number) => void;
+}
+
+/// Live state of an open-ended grind.
+export interface GrindProgress {
+  /// Best solution so far, or null until the first one turns up.
+  best: Solution | null;
+  tried: number;
+  hashesPerSecond: number;
+  /// Seconds since the grind started.
+  elapsed: number;
+}
+
+export interface GrindOptions {
+  /// The floor the finished proof must clear — your consumer's policy.
+  /// `commit()` refuses below it. Default 18.
+  minBits?: number;
+  /// Called on every improvement, and periodically in between.
+  onProgress?: (progress: GrindProgress) => void;
+}
+
+/// An open-ended grind the caller stops when satisfied — for apps where the
+/// user chooses how much to invest rather than being handed a fixed bar.
+/// Started by [`AnteClient.grind`].
+export interface GrindSession {
+  /// Best solution so far, or null.
+  readonly best: Solution | null;
+  /// Whether [`commit`] would be accepted — i.e. `best` clears `minBits`.
+  readonly ready: boolean;
+  /// Stop grinding and sign the best solution found, raising the consent
+  /// prompt. Throws if nothing has cleared `minBits` yet.
+  commit(opts?: PromptOptions): Promise<CommitOutcome>;
+  /// Abandon the grind without committing. Safe to call twice.
+  stop(): void;
 }
 
 export class AnteClient {
@@ -87,6 +121,67 @@ export class AnteClient {
     const challenge = await this.challenge(purpose);
     const nonce = await grindInWorker(challenge, minBits, opts.onProgress);
     return this.signCommit(purpose, nonce, minBits, opts.onPrompt);
+  }
+
+  /// Start an open-ended grind and hand back a handle. Unlike `commit`, which
+  /// grinds to a fixed bar and signs, this keeps improving until you call
+  /// `commit()` or `stop()` — so a UI can show the work climbing and let the
+  /// user decide when it is enough.
+  ///
+  ///   const session = await ante.grind("myapp:post:v1", {
+  ///     minBits: 16,
+  ///     onProgress: (p) => render(p.best?.bits ?? 0, p.elapsed),
+  ///   });
+  ///   // …later, when the user clicks post:
+  ///   const outcome = await session.commit();
+  async grind(purpose: string, opts: GrindOptions = {}): Promise<GrindSession> {
+    const minBits = opts.minBits ?? 18;
+    const challenge = await this.challenge(purpose);
+    const worker = new PowWorker();
+    const started = performance.now();
+
+    let best: Solution | null = null;
+    let stopped = false;
+    const halt = () => {
+      if (!stopped) {
+        stopped = true;
+        worker.terminate();
+      }
+    };
+
+    worker.onmessage = (event: MessageEvent<PowWorkerMessage>) => {
+      const msg = event.data;
+      if (msg.type === "best") best = { nonce: msg.nonce, bits: msg.bits };
+      const elapsed = (performance.now() - started) / 1000;
+      opts.onProgress?.({
+        best,
+        tried: msg.tried,
+        hashesPerSecond: elapsed > 0 ? msg.tried / elapsed : 0,
+        elapsed,
+      });
+    };
+    worker.postMessage({ challenge } satisfies PowWorkerRequest);
+
+    const client = this;
+    return {
+      get best() {
+        return best;
+      },
+      get ready() {
+        return best !== null && best.bits >= minBits;
+      },
+      stop: halt,
+      async commit(promptOpts: PromptOptions = {}) {
+        const solution = best;
+        if (solution === null || solution.bits < minBits) {
+          throw new Error(
+            `grind has not reached ${minBits} bits yet (best ${solution?.bits ?? 0})`,
+          );
+        }
+        halt();
+        return client.signCommit(purpose, solution.nonce, minBits, promptOpts.onPrompt);
+      },
+    };
   }
 
   /// The challenge preimage for `purpose` — for callers running their own

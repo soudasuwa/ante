@@ -17,6 +17,9 @@ export {
   type PromptOptions,
   type ExportOutcome,
   type ImportOutcome,
+  type GrindOptions,
+  type GrindProgress,
+  type GrindSession,
 } from "./ante";
 export {
   identityCodeFromSeed,
@@ -40,7 +43,7 @@ export {
 } from "./ante-proof";
 
 // Low-level pieces, for callers running their own grinder or wire handling.
-export { Grinder, grind, powBits, powDigest, leadingZeroBits } from "./pow";
+export { Grinder, grind, powBits, powDigest, leadingZeroBits, type Solution } from "./pow";
 // A CBOR codec matching ciborium — for building your own contract's wire types.
 export {
   cborEncode,

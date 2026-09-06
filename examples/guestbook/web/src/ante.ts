@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────
 //  The entire ante integration. Everything ante-specific in this app is here.
 //
-//  Producing side  — one call: grind proof of work for GUESTBOOK_PURPOSE and,
-//                    with the user's consent, get a signed proof back.
-//  Verifying side  — one call: re-check every proof the app displays, so a
-//                    forged entry that somehow reached state is not shown as
-//                    valid. (The contract already rejects them on write; this
-//                    is defence in depth and lets the UI label each entry.)
+//  Producing side  — start an open-ended grind, let the reader decide how much
+//                    work to commit, then sign the best result they waited for.
+//  Verifying side  — re-check every proof the app displays, so a forged entry
+//                    that somehow reached state is not shown as valid. (The
+//                    contract already rejects them on write; this is defence in
+//                    depth and lets the UI label each entry.)
 // ─────────────────────────────────────────────────────────────────────────
 
 import {
@@ -14,13 +14,13 @@ import {
   verifyAnteProof,
   type AnteProof,
   type FreenetClient,
+  type GrindProgress,
+  type GrindSession,
 } from "@ante/client";
 
 import { GUESTBOOK_MIN_BITS, GUESTBOOK_PURPOSE } from "./guestbook";
 
-export interface GrindProgress {
-  (tried: number, hashesPerSecond: number): void;
-}
+export type { GrindProgress, GrindSession };
 
 /// Attach the ante delegate to the node. The delegate WASM ships inside
 /// @ante/client — nothing to deploy.
@@ -28,19 +28,15 @@ export function attachAnte(fn: FreenetClient): Promise<AnteClient> {
   return AnteClient.attach(fn);
 }
 
-/// Grind a proof for one post. Resolves to the proof, or null if the user
-/// declined the consent prompt. `onProgress` drives the grind indicator;
-/// `onPrompt` fires when the request reaches the node.
-export async function proofForPost(
+/// Begin grinding for a post. Returns a handle: it keeps improving the proof
+/// until `commit()` (sign the best so far, behind the consent prompt) or
+/// `stop()`. `GUESTBOOK_MIN_BITS` is the contract's floor, so `session.ready`
+/// only turns true once the proof would actually be accepted.
+export function startPostGrind(
   ante: AnteClient,
-  opts: { onProgress?: GrindProgress; onPrompt?: () => void },
-): Promise<AnteProof | null> {
-  const outcome = await ante.commit(GUESTBOOK_PURPOSE, {
-    minBits: GUESTBOOK_MIN_BITS,
-    onProgress: opts.onProgress,
-    onPrompt: opts.onPrompt,
-  });
-  return outcome.kind === "committed" ? outcome.proof : null;
+  onProgress: (progress: GrindProgress) => void,
+): Promise<GrindSession> {
+  return ante.grind(GUESTBOOK_PURPOSE, { minBits: GUESTBOOK_MIN_BITS, onProgress });
 }
 
 /// Re-verify a displayed entry's proof. Returns the bits it demonstrates, or

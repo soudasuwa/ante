@@ -4,6 +4,12 @@ A standalone Freenet app: anyone can sign the guestbook, but every post carries
 a **proof of work**. Entries are grouped by how much the author committed, so a
 drive-by spammer's posts sit at the bottom and cost real CPU to make at all.
 
+How high your message sits is how long you were willing to let your browser
+grind — you watch the number climb and post when you have had enough. The tier
+bands (16–17 / 18–19 / 20–21 / 22–23 / 24+) are 2 bits apart, so each is ~4× the
+work of the one below, calibrated to the ~200k hashes/s that pure-JS blake3
+actually manages in a browser.
+
 It exists to show the **integration surface**. ante is not a big dependency —
 it's one call to get a proof and one call to check one. Everything else here is
 ordinary Freenet contract + web code.
@@ -23,7 +29,7 @@ The code is split so the boundary is obvious:
 | File | ante? | what it does |
 |---|---|---|
 | `web/src/guestbook.ts` | **no** | CBOR wire types, contract GET / delta UPDATE — what a client for *any* contract looks like |
-| `web/src/ante.ts` | **yes, all of it** | `attach` the delegate, `commit` a proof per post, `verify` proofs on display |
+| `web/src/ante.ts` | **yes, all of it** | `attach` the delegate, `grind` a proof per post, `verify` proofs on display |
 | `web/src/main.ts` | glue | form → `ante.ts` for a proof → `guestbook.ts` to store it |
 | `contract/src/lib.rs` | one line | `entry.proof.verify(params.min_bits)?` in `validate_state` / `update_state` |
 
@@ -51,23 +57,41 @@ fixed when you publish, and part of the contract's address.
 
 ### 2. Producer — the web app (`web/src/ante.ts`)
 
+`@ante/client` offers two shapes, and which you pick is a product decision.
+
+**Fixed bar** — you choose the cost, the user waits:
+
+```ts
+const outcome = await ante.commit("ante-guestbook:post:v1", { minBits: 16 });
+```
+
+**Open-ended** — the *user* chooses the cost, by deciding when to stop. This is
+what the guestbook uses, because it is what makes the tiers mean something:
+
 ```ts
 import { AnteClient } from "@ante/client";
 
 const ante = await AnteClient.attach(fn);              // once, after connecting
 
-const outcome = await ante.commit("ante-guestbook:post:v1", {
-  minBits: 16,
-  onProgress: (tried, hps) => { /* update the grind indicator */ },
+const session = await ante.grind("ante-guestbook:post:v1", {
+  minBits: 16,                                          // the contract's floor
+  onProgress: (p) => render(p.best?.bits ?? 0, p.elapsed),
 });
+
+// …the grind keeps improving in a worker while the user watches.
+// When they click post:
+const outcome = await session.commit();                 // signs the best so far
 // outcome.proof  — the decoded proof, to put in your record
 // outcome.bytes  — its CBOR, if you'd rather store it opaquely
 ```
 
-`commit` runs the whole round trip: fetch a challenge from the delegate, grind
-proof of work in a worker, then a **consent prompt on the user's node**. The
-delegate holds the identity key; the app never sees it. If the user declines,
-`outcome.kind === "denied"`.
+Either way the delegate raises a **consent prompt on the user's node** before
+signing; it holds the identity key and the app never sees it. If the user
+declines, `outcome.kind === "denied"`.
+
+Open-ended grinding is self-calibrating: a fast desktop and a slow phone both
+produce a sensible spread for the same amount of human patience, which a
+hardcoded `minBits` cannot do.
 
 ### 3. Carrying the proof through your own data model (`web/src/guestbook.ts`)
 

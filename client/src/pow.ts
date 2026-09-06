@@ -34,9 +34,18 @@ export function powBits(challenge: Uint8Array, nonce: number): number {
   return leadingZeroBits(powDigest(challenge, nonce));
 }
 
-/// A reusable grinder over one challenge. `next(count)` tries the next `count`
-/// nonces and returns the first satisfying one, or `null` if none in that
-/// batch — so the caller can report progress between batches.
+/// One nonce and the work it demonstrates.
+export interface Solution {
+  nonce: number;
+  bits: number;
+}
+
+/// A reusable grinder over one challenge. The caller drives it in batches so it
+/// can report progress between them.
+///
+/// Two ways to use it, matching the two ways an app can ask for work:
+/// `next()` stops at a fixed bar ("give me 18 bits"), while `nextBest()` keeps
+/// improving on what it has ("keep going until I say stop").
 export class Grinder {
   private readonly input: Uint8Array;
   private readonly nonceView: DataView;
@@ -45,22 +54,45 @@ export class Grinder {
 
   constructor(
     challenge: Uint8Array,
-    private readonly targetBits: number,
+    private readonly targetBits: number = 0,
   ) {
     this.input = new Uint8Array(challenge.length + 8);
     this.input.set(challenge);
     this.nonceView = new DataView(this.input.buffer, challenge.length, 8);
   }
 
+  /// Bits demonstrated by the current nonce; advances by one.
+  private step(): number {
+    this.nonceView.setBigUint64(0, BigInt(this.nonce), true);
+    const bits = leadingZeroBits(blake3(this.input));
+    this.tried++;
+    return bits;
+  }
+
+  /// The first nonce in the next `batch` that reaches `targetBits`, or `null`.
   next(batch: number): number | null {
     for (let i = 0; i < batch; i++) {
-      this.nonceView.setBigUint64(0, BigInt(this.nonce), true);
-      const digest = blake3(this.input);
-      this.tried++;
-      if (leadingZeroBits(digest) >= this.targetBits) return this.nonce;
+      if (this.step() >= this.targetBits) return this.nonce;
       this.nonce++;
     }
     return null;
+  }
+
+  /// The best solution in the next `batch` that beats `sinceBits`, or `null` if
+  /// nothing in it did. Open-ended grinding: the caller keeps the running best
+  /// and decides when it is satisfied.
+  nextBest(batch: number, sinceBits: number): Solution | null {
+    let found: Solution | null = null;
+    let bar = sinceBits;
+    for (let i = 0; i < batch; i++) {
+      const bits = this.step();
+      if (bits > bar) {
+        found = { nonce: this.nonce, bits };
+        bar = bits;
+      }
+      this.nonce++;
+    }
+    return found;
   }
 }
 

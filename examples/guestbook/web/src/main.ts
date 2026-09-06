@@ -4,9 +4,9 @@
 
 import "./style.css";
 
-import { FreenetClient, fingerprint, type AnteProof } from "@ante/client";
+import { FreenetClient, fingerprint } from "@ante/client";
 
-import { attachAnte, checkProof, proofForPost } from "./ante";
+import { attachAnte, checkProof, startPostGrind, type GrindSession } from "./ante";
 import {
   contractId,
   Guestbook,
@@ -17,12 +17,17 @@ import {
 } from "./guestbook";
 
 // ── commitment tiers (app policy, nothing ante-specific) ──────────────────
-// Buckets of 4 bits. Each +1 bit is ~2× the work, so a tier up is ~16×.
+//
+// Bands of 2 bits, so each tier is ~4x the work of the one below. Calibrated to
+// what a browser can actually do: pure-JS blake3 runs ~200k hashes/s, and
+// expected tries is 2^bits. Wider bands (or a 28+ tier) would be decorative —
+// nobody grinds for 20 minutes to sign a guestbook.
 const TIERS = [
-  { min: 28, label: "28+ bits" },
-  { min: 24, label: "24–27 bits" },
-  { min: 20, label: "20–23 bits" },
-  { min: GUESTBOOK_MIN_BITS, label: `${GUESTBOOK_MIN_BITS}–19 bits` },
+  { min: 24, label: "24+ bits", effort: "minutes of work" },
+  { min: 22, label: "22–23 bits", effort: "~30 seconds" },
+  { min: 20, label: "20–21 bits", effort: "~10 seconds" },
+  { min: 18, label: "18–19 bits", effort: "~2 seconds" },
+  { min: GUESTBOOK_MIN_BITS, label: `${GUESTBOOK_MIN_BITS}–17 bits`, effort: "the minimum" },
 ];
 
 function tierOf(bits: number) {
@@ -38,6 +43,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 
 let gb: Guestbook | null = null;
 let ante: Awaited<ReturnType<typeof attachAnte>> | null = null;
+/// The in-flight grind, if the compose form is currently working.
+let session: GrindSession | null = null;
 
 function status(text: string, kind: "" | "ok" | "err" = "") {
   const el = $("status");
@@ -46,7 +53,9 @@ function status(text: string, kind: "" | "ok" | "err" = "") {
 }
 
 async function boot() {
+  $("start").addEventListener("click", () => void startGrinding());
   $("post").addEventListener("click", () => void submit());
+  $("cancel").addEventListener("click", cancelGrinding);
 
   if (!contractId()) {
     status("no guestbook contract configured — see the README", "err");
@@ -107,6 +116,10 @@ function render(shown: Shown[]) {
     section.className = "tier";
     const h = document.createElement("h2");
     h.textContent = tier.label;
+    const hint = document.createElement("span");
+    hint.className = "tier-effort";
+    hint.textContent = tier.effort;
+    h.appendChild(hint);
     section.appendChild(h);
     for (const s of inTier) section.appendChild(entryCard(s));
     list.appendChild(section);
@@ -135,50 +148,106 @@ function entryCard({ entry, bits }: Shown): HTMLElement {
   return card;
 }
 
-async function submit() {
-  if (!gb || !ante) return;
-  const btn = $("post") as HTMLButtonElement;
+// ── composing: grind, watch it climb, post when you're happy ──────────────
+//
+// The grind is open-ended rather than aimed at a fixed bar. That is the whole
+// point of the tiers: how high your message sits is how long you were willing
+// to wait, decided while you watch, on whatever hardware you happen to have.
+
+function setComposeState(state: "idle" | "grinding" | "posting") {
+  ($("start") as HTMLButtonElement).hidden = state !== "idle";
+  ($("post") as HTMLButtonElement).hidden = state === "idle";
+  ($("cancel") as HTMLButtonElement).hidden = state === "idle";
+  ($("post") as HTMLButtonElement).disabled = state === "posting";
+  ($("cancel") as HTMLButtonElement).disabled = state === "posting";
+  $("grind-panel").hidden = state === "idle";
+  for (const id of ["name", "text"]) {
+    ($(id) as HTMLInputElement).disabled = state !== "idle";
+  }
+}
+
+function renderGrind(bits: number | null, elapsed: number) {
+  const post = $("post") as HTMLButtonElement;
+  $("grind-elapsed").textContent = `${elapsed.toFixed(0)}s`;
+
+  if (bits === null || bits < GUESTBOOK_MIN_BITS) {
+    $("grind-bits").textContent = "…";
+    $("grind-tier").textContent = `below ${GUESTBOOK_MIN_BITS} bits`;
+    post.disabled = true;
+    post.textContent = "Post";
+    return;
+  }
+  const tier = tierOf(bits);
+  $("grind-bits").textContent = `${bits} bits`;
+  $("grind-tier").textContent = tier.label;
+  post.disabled = false;
+  post.textContent = `Post at ${bits} bits`;
+}
+
+function composeInput(): { name: string; text: string } | null {
   const progress = $("progress");
   const name = ($("name") as HTMLInputElement).value.trim();
   const text = ($("text") as HTMLTextAreaElement).value.trim();
 
+  progress.hidden = false;
   if (!name || !text) {
-    progress.hidden = false;
     progress.textContent = "enter a name and a message first";
-    return;
+    return null;
   }
   if (enc(name) > MAX_NAME_BYTES || enc(text) > MAX_TEXT_BYTES) {
-    progress.hidden = false;
     progress.textContent = `too long — name ≤ ${MAX_NAME_BYTES} bytes, message ≤ ${MAX_TEXT_BYTES}`;
-    return;
+    return null;
   }
+  progress.hidden = true;
+  return { name, text };
+}
 
-  btn.disabled = true;
+async function startGrinding() {
+  if (!ante || session || !composeInput()) return;
+  setComposeState("grinding");
+  renderGrind(null, 0);
+  try {
+    session = await startPostGrind(ante, (p) => renderGrind(p.best?.bits ?? null, p.elapsed));
+  } catch (err) {
+    $("progress").hidden = false;
+    $("progress").textContent = `failed: ${(err as Error).message}`;
+    cancelGrinding();
+  }
+}
+
+function cancelGrinding() {
+  session?.stop();
+  session = null;
+  setComposeState("idle");
+}
+
+async function submit() {
+  const input = composeInput();
+  if (!gb || !session || !input) return;
+
+  const progress = $("progress");
+  setComposeState("posting");
   progress.hidden = false;
   try {
-    progress.textContent = `grinding proof of work (≥ ${GUESTBOOK_MIN_BITS} bits)…`;
-    const proof: AnteProof | null = await proofForPost(ante, {
-      onProgress: (tried, hps) => {
-        progress.textContent = `grinding — ${tried.toLocaleString()} hashes (${Math.round(hps).toLocaleString()}/s)`;
-      },
-      onPrompt: () => {
-        progress.textContent = "approve the prompt on your node (you have 60 s)…";
-      },
+    const outcome = await session.commit({
+      onPrompt: () => (progress.textContent = "approve the prompt on your node (you have 60 s)…"),
     });
-    if (!proof) {
+    if (outcome.kind === "denied") {
       progress.textContent = "you declined the prompt — nothing was posted";
+      setComposeState("grinding"); // the proof is still good; they can retry
       return;
     }
 
     progress.textContent = "posting…";
-    await gb.post({ name, text, proof });
+    await gb.post({ ...input, proof: outcome.proof });
     ($("text") as HTMLTextAreaElement).value = "";
     progress.textContent = "posted.";
+    session = null;
+    setComposeState("idle");
     await refresh();
   } catch (err) {
     progress.textContent = `failed: ${(err as Error).message}`;
-  } finally {
-    btn.disabled = false;
+    setComposeState("grinding");
   }
 }
 

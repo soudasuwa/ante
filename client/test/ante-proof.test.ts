@@ -9,7 +9,7 @@ import {
   verifyAnteProof,
 } from "../src/ante-proof";
 import { cborEncode } from "../src/cbor";
-import { grind, powBits } from "../src/pow";
+import { Grinder, grind, powBits } from "../src/pow";
 import { bytesToHex, hexToBytes } from "../src/util";
 
 // The canonical vector, from `cargo run -p ante-core --example print_vector`.
@@ -95,5 +95,46 @@ describe("grinder", () => {
     const challenge = challengeBytes("test:purpose", new Uint8Array(32).fill(3));
     const nonce = grind(challenge, 10);
     expect(powBits(challenge, nonce)).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe("open-ended grinding", () => {
+  const challenge = challengeBytes("test:open", new Uint8Array(32).fill(5));
+
+  it("nextBest only reports strict improvements", () => {
+    const g = new Grinder(challenge);
+    let best = -1;
+    const seen: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      const hit = g.nextBest(2048, best);
+      if (hit) {
+        expect(hit.bits).toBeGreaterThan(best);
+        best = hit.bits;
+        seen.push(hit.bits);
+      }
+    }
+    expect(seen.length).toBeGreaterThan(0);
+    // strictly increasing — a UI can render each one as a new personal best
+    expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+
+  it("every reported solution really demonstrates the bits it claims", () => {
+    const g = new Grinder(challenge);
+    let best = -1;
+    for (let i = 0; i < 40; i++) {
+      const hit = g.nextBest(2048, best);
+      if (!hit) continue;
+      best = hit.bits;
+      expect(powBits(challenge, hit.nonce)).toBe(hit.bits);
+    }
+    expect(best).toBeGreaterThanOrEqual(8);
+  });
+
+  it("counts every hash it tries", () => {
+    const g = new Grinder(challenge);
+    g.nextBest(1000, 0);
+    g.nextBest(500, 0);
+    expect(g.tried).toBe(1500);
   });
 });
