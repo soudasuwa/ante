@@ -96,11 +96,29 @@ namespaced `ante:identity:v1:webapp:<contract-id>` /
 callers see only the verifying key and finished proofs. Generated from host
 entropy on first use; an all-zero seed (entropy failure) is refused.
 
-## Non-goals (Phase 1)
+## Non-goals
 
-- No registry contract yet — a proof is held by whoever the delegate handed it
-  to. (Phase 2.)
 - No "always allow" grant — every `Commit` prompts. (Could change.)
 - No freshness / epoch binding on the PoW. A consumer that needs it folds a
   recent marker into its `purpose` string.
 - No defense against a resourced adversary. By design.
+
+## Before v0.2: upgrade migration
+
+Both the delegate and the registry contract are content-addressed
+(`blake3(code_hash ‖ params)`), so any rebuild that changes their WASM —
+a bug fix, a dependency bump — produces a new key and strands what was stored
+under the old one: every user's identity seed (delegate) and every published
+level (registry).
+
+The committed per-crate `Cargo.lock` prevents *accidental* re-keys. A
+*deliberate* upgrade needs [`freenet-migrate`](https://github.com/freenet/freenet-migrate)
+(the same tool ghostkeys uses for its delegate secrets). When cutting v0.2:
+
+1. Record the current WASM `code_hash`es in a `legacy.toml` per crate.
+2. Registry: impl `freenet_scaffold::ComposableState` for `RegistryState`
+   (the hand-rolled `merge` already satisfies the semantics) so
+   `carry_forward` can fold old state through the contract's own validator.
+3. Delegate: add a `SecretTransport` impl to export/import the identity seeds.
+
+Not done now — v0.1 has one user and no successor.
