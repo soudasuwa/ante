@@ -10,7 +10,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRACT_DIR="$REPO_ROOT/examples/guestbook/contract"
 
-PURPOSE="${ANTE_GUESTBOOK_PURPOSE:-ante-guestbook:post:v1}"
+PURPOSE="${ANTE_GUESTBOOK_PURPOSE:-ante-guestbook:post:v2}"
 MIN_BITS="${ANTE_GUESTBOOK_MIN_BITS:-16}"
 FDEV_ARGS="${FDEV_ARGS:-}"
 

@@ -31,16 +31,10 @@
       ]
     },
     "guestbook": {
-      "instance": "HtGCAKDGRxwP5oEifcBBzuZT9iPReZMkyEByaqsJ9Bug",
-      "purpose": "ante-guestbook:post:v1",
+      "instance": "DAGX9qjonjTPFyfLP9rEsJtzT9XSuFBEWeaxc9WVPZu8",
+      "purpose": "ante-guestbook:post:v2",
       "minBits": 16,
-      "superseded": [
-        "EXsqzKvKBJJ5BD69LQPXJERXQpUNCn8L1TPEHAoDRofd",
-        "Hs8VUxPnm6d62BU58489mEZ9tngNzEUdqBBTkmaLDBp",
-        "FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw",
-        "3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL",
-        "Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9"
-      ]
+      "superseded": []
     }
   },
   "delegate": {

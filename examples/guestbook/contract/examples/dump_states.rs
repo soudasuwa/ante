@@ -12,7 +12,7 @@ use ante_core::{pow, proof::AnteProof};
 use ante_guestbook_contract::{content_purpose, Entry, GuestbookState};
 use ed25519_dalek::SigningKey;
 
-const PURPOSE: &str = "ante-guestbook:post:v1";
+const PURPOSE: &str = "ante-guestbook:post:v2";
 const MIN_BITS: u32 = 16;
 
 fn entry(seed: u8, name: &str, text: &str) -> Entry {

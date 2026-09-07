@@ -187,7 +187,7 @@ cargo run -q --manifest-path "$REPO_ROOT/Cargo.toml" -p registry-params -- \
   --purpose "${ANTE_REGISTRY_PURPOSE:-ante:identity-level:v1}" \
   --floor "${ANTE_REGISTRY_FLOOR:-12}" --out "$WORK/reg.params" >/dev/null
 (cd "$REPO_ROOT/examples/guestbook/contract" && cargo run -q --example params -- \
-  --purpose "${ANTE_GUESTBOOK_PURPOSE:-ante-guestbook:post:v1}" \
+  --purpose "${ANTE_GUESTBOOK_PURPOSE:-ante-guestbook:post:v2}" \
   --min-bits "${ANTE_GUESTBOOK_MIN_BITS:-16}" --out "$WORK/gb.params" >/dev/null)
 
 REG_ID="$(fdev get-contract-id --code "$REG_WASM" --parameters "$WORK/reg.params")"

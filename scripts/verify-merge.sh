@@ -50,7 +50,7 @@ emit_registry_params() {
 
 # registry-params/--out writes to a path; use a temp file and cat it.
 reg_params() { local f; f="$(mktemp)"; cargo run -q --manifest-path "$REPO_ROOT/Cargo.toml" -p registry-params -- --purpose "ante:identity-level:v1" --floor 12 --out "$f" >/dev/null; cat "$f"; rm -f "$f"; }
-gb_params()  { local f; f="$(mktemp)"; (cd "$REPO_ROOT/examples/guestbook/contract" && cargo run -q --example params -- --purpose "ante-guestbook:post:v1" --min-bits 16 --out "$f" >/dev/null); cat "$f"; rm -f "$f"; }
+gb_params()  { local f; f="$(mktemp)"; (cd "$REPO_ROOT/examples/guestbook/contract" && cargo run -q --example params -- --purpose "ante-guestbook:post:v2" --min-bits 16 --out "$f" >/dev/null); cat "$f"; rm -f "$f"; }
 
 check ante-registry contracts/ante-registry ante_registry_contract.wasm reg_params
 check guestbook examples/guestbook/contract ante_guestbook_contract.wasm gb_params

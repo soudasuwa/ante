@@ -44,7 +44,7 @@ const GUESTBOOK_CONTRACT_ID = deployments.contracts.guestbook.instance;
 
 /// Must match the parameters the contract was published with
 /// (`ANTE_GUESTBOOK_PURPOSE` / `ANTE_GUESTBOOK_MIN_BITS` in the publish script).
-export const GUESTBOOK_PURPOSE = "ante-guestbook:post:v1";
+export const GUESTBOOK_PURPOSE = "ante-guestbook:post:v2";
 export const GUESTBOOK_MIN_BITS = 16;
 
 export const MAX_NAME_BYTES = 40;

@@ -35,7 +35,7 @@ describe("guestbook wire format", () => {
     // TypeScript mirror ever drifts, every post from the browser starts being
     // rejected by the contract — so pin the two against each other here.
     expect(entry.proof.purpose).toBe(contentPurpose("alice", "hello"));
-    expect(entry.proof.purpose.startsWith("ante-guestbook:post:v1:")).toBe(true);
+    expect(entry.proof.purpose.startsWith("ante-guestbook:post:v2:")).toBe(true);
     expect(entry.proof.identityVk).toHaveLength(32);
     expect(entry.proof.signature).toHaveLength(64);
   });
@@ -78,7 +78,7 @@ describe("carry-forward across a re-key", () => {
     // report the generation as merely empty.
     const legacy = {
       ...good,
-      proof: { ...good.proof, purpose: "ante-guestbook:post:v1" },
+      proof: { ...good.proof, purpose: "ante-guestbook:post:v2" },
     };
     const { carryable, dropped } = carryableEntries([good, legacy]);
     expect(carryable).toHaveLength(1);

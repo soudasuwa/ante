@@ -53,7 +53,23 @@ WebSocket API; there is nothing to render.
 | Contract | Instance | Parameters | Publish |
 |---|---|---|---|
 | ante-registry | `GJefZKcv5zUGCmQ6oMYYfNzfK7rwZQ73VuBXBVTmHL9m` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
-| guestbook example | `HtGCAKDGRxwP5oEifcBBzuZT9iPReZMkyEByaqsJ9Bug` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
+| guestbook example | `DAGX9qjonjTPFyfLP9rEsJtzT9XSuFBEWeaxc9WVPZu8` | purpose `ante-guestbook:post:v2`, min_bits 16 | `./scripts/publish-guestbook.sh` |
+
+**The guestbook was reset for launch (2026-09-07).** Its purpose moved to
+`ante-guestbook:post:v2`, which is a new instance and therefore an empty book —
+Freenet state is a grow-only CRDT, so there is no delete, and a fresh address is
+the only clean slate. Its `superseded` list is deliberately EMPTY: leaving the
+predecessor there would have the carry-forward sweep faithfully restore every
+pre-launch test post, which is the opposite of the intent. The old instance
+still exists and still holds them; nothing points at it.
+
+That is the one case where dropping a predecessor is correct. Everywhere else it
+is data a future migration cannot reach, which is why the publish scripts record
+lineage automatically — the entry here had to be removed by hand, after
+publishing, on purpose.
+
+The registry keeps its full lineage: identity levels are worth carrying, and a
+level is not spam.
 
 Both moved twice on 2026-09-07, and this is the last time they should move for
 a build reason. The first move fixed a non-reproducible build; the second
@@ -69,7 +85,7 @@ generations are recorded in `deployments.json` under `superseded`, and both apps
 sweep them on load to carry levels and posts forward. They stay readable;
 nothing was deleted.
 
-The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`HtGCA…`).
+The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`DAGX9…`).
 Two different ids for one example — that is the normal shape of a Freenet app,
 not a quirk of this one.
 

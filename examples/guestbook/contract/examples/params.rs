@@ -7,7 +7,7 @@
 use ante_guestbook_contract::GuestbookParameters;
 
 fn main() {
-    let mut purpose = "ante-guestbook:post:v1".to_string();
+    let mut purpose = "ante-guestbook:post:v2".to_string();
     let mut min_bits: u32 = 16;
     let mut out: Option<String> = None;
 
