@@ -4,6 +4,8 @@
 
 import "./style.css";
 
+import deployments from "../../deployments.json";
+
 import {
   AnteClient,
   decodeAnteProof,
@@ -358,6 +360,8 @@ function runVerify() {
 // --------------------------------------------------------------------------
 
 function wireStaticHandlers() {
+  ($("home-link") as HTMLAnchorElement).href =
+    `/v1/contract/web/${deployments.sites.home.contract}/`;
   ($("improve-bits") as HTMLInputElement).addEventListener("input", updateImproveLabel);
   $("improve-go").addEventListener("click", () => void runImprove());
   $("recovery-reveal").addEventListener("click", () => void revealRecovery());

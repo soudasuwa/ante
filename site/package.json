@@ -1,0 +1,19 @@
+{
+  "name": "ante-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "prebuild": "node scripts/render-whitepaper.mjs",
+    "predev": "node scripts/render-whitepaper.mjs",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "marked": "^14.1.4",
+    "typescript": "^5.6",
+    "vite": "^6.0"
+  }
+}

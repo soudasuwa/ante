@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ante</title>
+    <meta name="description" content="A small, mandatory proof-of-work commitment for Freenet identities — the step between no effort at all and a ghost key." />
+  </head>
+  <body>
+    <main class="doc">
+      <header>
+        <h1>ante</h1>
+        <p class="lede">
+          A small, mandatory proof-of-work commitment for
+          <a href="https://freenet.org">Freenet</a> identities — the step
+          between <em>no effort at all to sybil</em> and
+          <em><a href="https://freenet.org/ghostkey">a ghost key</a></em>.
+        </p>
+      </header>
+
+      <p>
+        A guestbook or a comment box on a decentralised network has no server to
+        rate-limit at, no account to suspend, no IP worth blocking. Ghost keys
+        solve identity properly, but they cost real money and involve a third
+        party — absurd friction for signing a guestbook.
+      </p>
+      <p>
+        ante fills that gap. An app asks your <strong>ante key</strong> for a
+        signed proof that it burned a measurable slice of CPU for this specific
+        action. Checking one is a single hash and a single signature check, by
+        anyone, with no network access and nothing to trust.
+      </p>
+
+      <section class="scope">
+        <h2>What a proof means</h2>
+        <p>
+          <strong>It proves the key cost something</strong> for this exact
+          purpose. That is the whole claim.
+        </p>
+        <p class="muted">
+          It does <strong>not</strong> prove the key is unique, human-held, or
+          not one of thousands an attacker made — each costs the same. It is not
+          proof of personhood, and it does not resist anyone with real hardware.
+          It is a floor, not a ceiling; ghost keys and reputation sit above it.
+        </p>
+      </section>
+
+      <section>
+        <h2>Your key</h2>
+        <p>
+          One Ed25519 key, held by your own Freenet node and shared across every
+          app that uses ante — so work you commit in one place counts everywhere.
+          The private half never leaves your node: apps see the public key and
+          finished proofs, and every use raises a consent prompt your node draws,
+          not the app.
+        </p>
+        <p>
+          Because it is yours, it is yours to lose. Save its recovery code.
+        </p>
+      </section>
+
+      <section>
+        <h2>Apps</h2>
+        <ul class="apps">
+          <li>
+            <a class="app" id="link-vault" href="#">
+              <strong>ante vault</strong>
+              <span class="muted">Create your key, raise its level, manage which apps may use it, and save its recovery code.</span>
+            </a>
+            <code class="addr" id="addr-vault"></code>
+          </li>
+          <li>
+            <a class="app" id="link-guestbook" href="#">
+              <strong>ante guestbook</strong>
+              <span class="muted">A working example: every post carries proof of work, and entries are ranked by how much their author spent.</span>
+            </a>
+            <code class="addr" id="addr-guestbook"></code>
+          </li>
+        </ul>
+        <p class="muted small">
+          Those addresses are the apps. Nothing here reads an address from the
+          URL — a link that could repoint one would let anyone show you their
+          data under a genuine address. Check what you open against this list.
+        </p>
+      </section>
+
+      <section>
+        <h2>How it works</h2>
+        <p>
+          You grind a nonce until <code>blake3(challenge ‖ nonce)</code> starts
+          with enough zero bits, where the challenge binds a purpose string and
+          your key. Your node signs the result. Anyone can recompute the bit
+          count from the nonce — it is never stored, so it can never be
+          overstated.
+        </p>
+        <p>
+          Each extra bit is twice the work. In a browser that means roughly a
+          second for 18 bits, ten for 20, a minute for 24.
+        </p>
+        <p class="cta">
+          <a href="./whitepaper.html">Read the whitepaper &rarr;</a>
+          <span class="muted small">the full argument, wire formats, threat model, and what went wrong along the way</span>
+        </p>
+      </section>
+
+      <section>
+        <h2>Using it in your app</h2>
+        <p>Four calls. The delegate ships inside the client — nothing to deploy.</p>
+        <pre><code>const ante = await AnteClient.attach(fn);
+
+const outcome = await ante.commit("myapp:post:v1", { minBits: 18 });
+// attach outcome.proof to your contract write
+
+verifyAnteProof(entry.proof, 18);   // in the browser
+proof.verify(18)?                   // in your contract, via ante-core</code></pre>
+        <p class="muted small">
+          Bind the proof to what it pays for — put the message digest in the
+          purpose string, or one grind buys unlimited actions. The guestbook
+          example shows the whole integration, and the whitepaper explains why
+          that rule exists.
+        </p>
+      </section>
+
+      <footer>
+        <p>
+          <a href="https://github.com/soudasuwa/ante">Source on GitHub</a> ·
+          <a href="https://github.com/soudasuwa/ante/blob/main/SECURITY.md">Security reporting</a> ·
+          MIT OR Apache-2.0
+        </p>
+        <p class="muted small">
+          v0.1. A proof shows a key cost something; it does not show there is a
+          person behind it.
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

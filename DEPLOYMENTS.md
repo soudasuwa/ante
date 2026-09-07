@@ -22,13 +22,25 @@ losing one means that URL can never be updated again.**
 
 | Site | Key name | URL (on a node at `127.0.0.1:7509`) |
 |---|---|---|
-| Identity UI (`web/`) | `ante` | <http://127.0.0.1:7509/v1/contract/web/AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r/> |
-| Guestbook example | `guestbook` | <http://127.0.0.1:7509/v1/contract/web/HLqqoWvQZMRy1JF9g1DV34VUeagCzgGvC4mNepSC6WWV/> |
+| **ante** (home, `site/`) | `home` | <http://127.0.0.1:7509/v1/contract/web/6Ffg43GVU9Zec9VTbaVKaWATrz4p7YcShaKEYUZ73EXg/> |
+| **ante vault** (`web/`) | `ante` | <http://127.0.0.1:7509/v1/contract/web/AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r/> |
+| **ante guestbook** (example) | `guestbook` | <http://127.0.0.1:7509/v1/contract/web/HLqqoWvQZMRy1JF9g1DV34VUeagCzgGvC4mNepSC6WWV/> |
+
+The home page is the entry point: it explains what ante is, lists these
+addresses so a visitor can check what they opened, and renders the whitepaper.
+It needs no node connection at all (1 KB of JS against the other two's ~708 KB,
+which is almost entirely the embedded delegate).
+
+Every address above also lives in **`deployments.json`**, which the apps import
+at build time so they can link to each other without a second copy drifting.
+That file is the source of truth; this table mirrors it and CI checks the two
+agree.
 
 Republish with:
 
 ```bash
-./scripts/publish-web.sh                       # identity UI
+fdev website update ./site/dist --key home     # home page
+./scripts/publish-web.sh                       # vault
 npm run build --workspace ante-guestbook-web \
   && fdev website update ./examples/guestbook/web/dist --key guestbook
 ```

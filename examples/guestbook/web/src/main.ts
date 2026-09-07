@@ -6,6 +6,8 @@ import "./style.css";
 
 import { FreenetClient, fingerprint } from "@ante/client";
 
+import deployments from "../../../../deployments.json";
+
 import { attachAnte, checkProof, startPostGrind, type GrindSession } from "./ante";
 import {
   contractId,
@@ -51,7 +53,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 /// nothing — an `fdev website` address is blake3(container_wasm ‖
 /// publisher_key), so unlike a data contract this URL is permanent across
 /// every update.
-const ANTE_APP = "AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r";
+const ANTE_APP = deployments.sites.vault.contract;
 
 let gb: Guestbook | null = null;
 let ante: Awaited<ReturnType<typeof attachAnte>> | null = null;
@@ -69,6 +71,8 @@ function status(text: string, kind: "" | "ok" | "err" = "") {
 }
 
 async function boot() {
+  ($("home-link") as HTMLAnchorElement).href =
+    `/v1/contract/web/${deployments.sites.home.contract}/`;
   $("start").addEventListener("click", () => void startGrinding());
   $("post").addEventListener("click", () => void submit());
   $("cancel").addEventListener("click", cancelGrinding);

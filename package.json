@@ -4,6 +4,7 @@
   "type": "module",
   "workspaces": [
     "client",
+    "site",
     "web",
     "examples/guestbook/web"
   ],

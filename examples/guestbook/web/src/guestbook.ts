@@ -9,6 +9,8 @@
 
 import { blake3 } from "@noble/hashes/blake3.js";
 
+import deployments from "../../../../deployments.json";
+
 import {
   anteProofToCborValue,
   asString,
@@ -25,8 +27,9 @@ import {
   type FreenetClient,
 } from "@ante/client";
 
-/// The published guestbook contract instance. Baked in at build time and NOT
-/// overridable at runtime.
+/// The published guestbook contract instance, from the repository's
+/// deployments.json so this address lives in exactly one place. Baked in at
+/// BUILD time and NOT overridable at runtime.
 ///
 /// A `?contract=<id>` parameter would let anyone hand out a link that is the
 /// genuine guestbook — genuine address, genuine code — showing data they
@@ -37,7 +40,7 @@ import {
 /// republishing the site, which only the key holder can do. That is the same
 /// trust root, with nothing extra to run. To point a local build somewhere
 /// else, edit this line and rebuild.
-const GUESTBOOK_CONTRACT_ID = "FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw";
+const GUESTBOOK_CONTRACT_ID = deployments.contracts.guestbook.instance;
 
 /// Must match the parameters the contract was published with
 /// (`ANTE_GUESTBOOK_PURPOSE` / `ANTE_GUESTBOOK_MIN_BITS` in the publish script).

@@ -109,6 +109,8 @@ jobs:
           path: client/src
 
       - run: npm ci
+      - name: docs and apps agree on every live address
+        run: ./scripts/check-deployments.sh
       - name: typecheck (all workspaces)
         run: npm run typecheck
       - name: cross-impl guard (TS verifier vs the pinned Rust vector)

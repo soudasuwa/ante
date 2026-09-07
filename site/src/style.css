@@ -1,0 +1,135 @@
+/* Same tokens as the vault and the guestbook — visual consistency is part of
+   "is this the real thing". */
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf8;
+  --fg: #1a1a1a;
+  --muted: #6a6a6a;
+  --line: #e2e2dd;
+  --card: #ffffff;
+  --accent: #3a5a9a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16161a;
+    --fg: #e8e8e6;
+    --muted: #9a9a9a;
+    --line: #2c2c32;
+    --card: #1e1e24;
+    --accent: #7aa2e3;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.doc {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 5rem;
+}
+a { color: var(--accent); }
+
+h1 { margin: 0; font-size: 2rem; letter-spacing: -0.02em; }
+h2 {
+  margin: 2.5rem 0 0.6rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+h3 { margin: 1.8rem 0 0.5rem; font-size: 0.98rem; }
+p { margin: 0 0 0.9rem; }
+.lede { font-size: 1.1rem; color: var(--muted); margin: 0.6rem 0 2rem; }
+.muted { color: var(--muted); }
+.small { font-size: 0.87rem; }
+
+/* the scope box — the thing people most need to read */
+.scope {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  background: var(--card);
+  margin: 2rem 0;
+}
+.scope h2 { margin-top: 0; }
+.scope p:last-child { margin-bottom: 0; }
+
+/* apps */
+ul.apps { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+ul.apps li { margin-bottom: 1rem; }
+a.app {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.8rem 0.95rem;
+  background: var(--card);
+  text-decoration: none;
+  color: inherit;
+}
+a.app:hover { border-color: var(--accent); }
+a.app strong { display: block; color: var(--accent); margin-bottom: 0.15rem; }
+a.app span { font-size: 0.9rem; }
+.addr {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  word-break: break-all;
+  padding: 0.35rem 0.1rem 0;
+}
+
+.cta { margin-top: 1.2rem; }
+.cta a { font-weight: 600; }
+.cta span { display: block; margin-top: 0.15rem; }
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+}
+pre {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+pre code { font-size: inherit; }
+
+footer {
+  margin-top: 3.5rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+/* generated whitepaper page */
+.backlink { margin-bottom: 2rem; font-size: 0.9rem; }
+.doc table {
+  border-collapse: collapse;
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+.doc th, .doc td {
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.doc th { background: var(--card); }
+.doc blockquote {
+  margin: 0 0 1rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+.doc hr { border: 0; border-top: 1px solid var(--line); margin: 2.5rem 0; }
+.doc img { max-width: 100%; }
+.doc li { margin-bottom: 0.3rem; }
