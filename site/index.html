@@ -116,9 +116,11 @@ verifyAnteProof(entry.proof, 18);   // in the browser
 proof.verify(18)?                   // in your contract, via ante-core</code></pre>
         <p class="muted small">
           Bind the proof to what it pays for — put the message digest in the
-          purpose string, or one grind buys unlimited actions. The guestbook
-          example shows the whole integration, and the whitepaper explains why
-          that rule exists.
+          purpose string, or one grind buys unlimited actions. And note a proof
+          is not a token: it never expires and nothing marks it spent, so if
+          repeating an action means something in your app, dedupe it yourself.
+          The guestbook example shows the whole integration, and the whitepaper
+          explains why both rules exist.
         </p>
       </section>
 

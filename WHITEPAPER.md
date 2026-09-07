@@ -281,6 +281,25 @@ It was never per-post proof of work. It was a one-time toll, and for a lucky
 identity not even that. It surfaced as a user reporting "25 bits instantly" —
 a number that was entirely real, and whose realness was the bug.
 
+**A proof is not a token, and nothing spends it.** Even perfectly bound, a proof
+stays valid forever and can be presented any number of times: `ts` is
+unauthenticated, no expiry exists, and ante keeps no record of proofs already
+seen. It attests that a cost *was paid*, never that it was paid *once*.
+
+The guestbook survives this by accident of shape rather than by defence.
+Re-posting the same message is idempotent — entries are keyed
+`blake3(vk ‖ nonce ‖ text)` and inserted with `or_insert`, so a replay collapses
+onto the entry already there and buys nothing. Anyone can replay someone else's
+post verbatim; it stays bound to that identity and that text, and produces the
+same single entry.
+
+An application where repeating an action *means* something — a vote, a claim, a
+redemption, anything counted — inherits no such protection and must dedupe
+itself, on the proof or on `(identity, purpose)`. If instead each occasion should
+cost its own work, the occasion has to be in the purpose, which is the same rule
+as below. Deciding which of the two you want is the consumer's job; ante cannot
+infer it.
+
 **The fix, and the general rule.** Fold whatever the proof must not be
 transferable across into the purpose string:
 
@@ -920,7 +939,8 @@ would strand every secret. Send something stable.
 | Claim someone else's proof | the signature proves possession of the private key |
 | Overstate the work done | bits are recomputed from the nonce, never stored |
 | Tamper with nonce / ts / purpose | all covered by the signature |
-| Replay one signed entry verbatim | app-level: the guestbook keys entries by `blake3(vk ‖ nonce ‖ text)`, so replays collapse to one |
+| Replay one signed entry verbatim | app-level: the guestbook keys entries by `blake3(vk ‖ nonce ‖ text)`, so replays collapse to one. Nothing in ante prevents the replay — the app's shape absorbs it |
+| **Spend one proof many times** | **nothing.** A proof never expires and no spent-list exists; it attests a cost was paid, not that it was paid once. Idempotent apps are unaffected; anything that counts must dedupe on the proof or on `(identity, purpose)` — see §4.5 |
 | **Reuse one proof for a different message** | app-level, and easy to get wrong — see §4.5. The proof binds `(identity, purpose, nonce)` and nothing else, so the app must fold the message into `purpose` |
 | Answer someone else's consent prompt | the answering origin must match the parked, runtime-attested origin tag |
 | Knock down a pending prompt with a guessed id | id mismatch errors *without* clearing the parked state |
