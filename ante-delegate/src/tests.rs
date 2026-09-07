@@ -81,7 +81,11 @@ fn has_identity_reports_the_key_once_one_exists() {
 fn has_identity_does_not_prompt() {
     let mut env = env();
     let out = run(&mut env, &origin_a(), AnteRequest::HasIdentity);
-    assert_eq!(out.len(), 1, "a probe must answer in one message, not prompt");
+    assert_eq!(
+        out.len(),
+        1,
+        "a probe must answer in one message, not prompt"
+    );
     assert!(
         env.context_is_empty(),
         "a probe must not park a pending prompt"

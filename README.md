@@ -21,8 +21,23 @@ every design decision and the reasoning behind it, exact wire formats, the
 failure modes we hit, the threat model, and what we would do next. Written to
 be enough to rebuild the system from.
 
-🌐 **[DEPLOYMENTS.md](DEPLOYMENTS.md)** — what is live on Freenet: the two
-web-app URLs, the published contract instances, and the delegate key record.
+🌐 **[DEPLOYMENTS.md](DEPLOYMENTS.md)** — what is live on Freenet: the three
+web-app URLs (home, vault, guestbook), the published contract instances, and
+the delegate key record.
+
+🔍 **Verify the published artifacts yourself.** Every address is derived from
+bytes — the delegate key is `blake3(blake3(wasm))`, a contract instance is
+`blake3(blake3(wasm) ‖ params)` — so you do not have to take the record on
+trust:
+
+```bash
+./scripts/build-in-container.sh --check
+```
+
+That builds at a fixed path in a container and compares against
+`artifact-keys.toml`. A host build cannot reproduce those bytes (cargo hashes a
+path dependency's absolute path into `-C metadata`), which is exactly why the
+container exists. CI runs the same check on every push.
 
 ## Layout
 
