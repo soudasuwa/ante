@@ -190,6 +190,30 @@ footer a {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+/* The commitment level sits with the button, not with name and message, and
+   the distinction is not cosmetic: name and text are the SUBJECT — what the
+   person is saying — while the level is a term the ante system puts on the act
+   of saying it. Stacked as a third field it read as another part of the
+   message. Here it reads as one sentence, "Sign & post at 16 bits", which is
+   what it actually means. They share a data bundle; they are not the same
+   kind of thing. */
+.level-pick {
+  display: flex;
+  /* Explicit: the base `label` rule stacks its children in a column for the
+     name and message fields, and without this the word "at" would sit above
+     the select instead of beside it. */
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.level-pick select {
+  padding: 0.35rem 0.5rem;
 }
 #grind-panel {
   border: 1px solid var(--line);

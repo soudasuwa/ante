@@ -26,16 +26,6 @@
           Message
           <textarea id="text" rows="3" maxlength="500" placeholder="say hello"></textarea>
         </label>
-        <label>
-          Commitment
-          <select id="level">
-            <option value="16" selected>16 bits — about a second</option>
-            <option value="18">18 bits — a few seconds</option>
-            <option value="20">20 bits — around ten seconds</option>
-            <option value="22">22 bits — up to a minute</option>
-            <option value="24">24 bits — a minute or more</option>
-          </select>
-        </label>
         <p id="start-hint" class="muted">
           Your <strong>Ante key</strong> is an identity your own Freenet node
           holds for you — no signup, no email, nothing to remember. Posting
@@ -59,8 +49,18 @@
 
         <div class="actions">
           <button id="start">Sign &amp; post</button>
-          <p id="progress" class="progress" hidden></p>
+          <label for="level" class="level-pick">
+            at
+            <select id="level">
+              <option value="16" selected>16 bits · about a second</option>
+              <option value="18">18 bits · a few seconds</option>
+              <option value="20">20 bits · around ten seconds</option>
+              <option value="22">22 bits · up to a minute</option>
+              <option value="24">24 bits · a minute or more</option>
+            </select>
+          </label>
         </div>
+        <p id="progress" class="progress" hidden></p>
 
         <div id="identity-note" class="identity-note" hidden>
           <p>
