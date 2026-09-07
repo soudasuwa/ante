@@ -84,12 +84,15 @@ kept = kept.split("\n", 1)[1] if kept.startswith(" ---") or kept.startswith("\n"
 today = datetime.date.today().isoformat()
 out = []
 for name, old, new in [
+    # The delegate needs its code_hash as well: addressing a previous
+    # generation takes both, and the node still holds its WASM.
     ("delegate", field("key"), new_del),
     ("ante-registry", field("ante_registry_code_hash"), new_reg),
     ("guestbook", field("guestbook_code_hash"), new_gb),
 ]:
     if old and old != new:
-        out.append(f'[[superseded]]\nartifact = "{name}"\nretired = "{today}"\nvalue = "{old}"\n')
+        extra = f'code_hash = "{field("code_hash")}"\n' if name == "delegate" else ""
+        out.append(f'[[superseded]]\nartifact = "{name}"\nretired = "{today}"\nvalue = "{old}"\n{extra}')
 print("\n".join(out) + ("\n" if out else "") + kept.strip("\n"))
 PYEOF
 )"

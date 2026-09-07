@@ -964,9 +964,27 @@ themselves.
 
 Roughly in priority order.
 
-1. **Automatic secret carry-forward across a delegate re-key.** Today the user
-   restores manually from a recovery code. When freenet-core re-enables
-   copy-forward, wire the existing export/import into a `SecretTransport`.
+1. **Secret carry-forward across a delegate re-key — done, on request.** The
+   vault can find an identity stranded by an earlier delegate generation and
+   adopt it, without the user needing their recovery code.
+
+   It costs nothing to ship, because **freenet-core retains delegate WASM
+   indefinitely** — only an explicit `UnregisterDelegate` removes it — so a
+   generation the node once registered stays addressable by its key. Nothing
+   has to be re-bundled; the lineage in `deployments.json` is enough.
+
+   Two things are deliberate. It is a **button, not a sweep on load**: adopting
+   an identity raises two consent prompts, and a prompt nobody asked for is how
+   people learn to click through prompts. And both prompts stay — the old
+   generation must agree to reveal its seed, the current one to replace what it
+   holds. A delegate that handed its secrets to another delegate on request
+   would be a hole, not a feature.
+
+   The honest gap: a generation this node never registered is indistinguishable
+   from a broken one. Both are silence, and silence is not absence, so the UI
+   says so rather than reporting "nothing found". Still worth doing later:
+   running it automatically when it can be done without prompting, which needs
+   a `HasIdentity` request the delegate does not have.
 2. **Bucketed registry summaries** (§10.2), before the registry exceeds a few
    thousand identities. Batch with any other wire change.
 3. **Freshness.** `ts` is unauthenticated and always will be. If apps start

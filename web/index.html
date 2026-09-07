@@ -70,6 +70,19 @@
           <button data-copy="recovery-code" class="ghost">copy</button>
         </div>
 
+        <details id="recovery-previous">
+          <summary>Recover an identity from an earlier version of ante</summary>
+          <p class="muted">
+            Updating ante can move where your identity is stored, leaving the
+            old one on this node but out of reach. This looks for it. Your node
+            will ask twice — once to read the identity out of the old version,
+            once to store it in this one.
+          </p>
+          <button id="previous-find">Look for an earlier identity</button>
+          <p id="previous-status" class="progress" hidden></p>
+          <ul id="previous-list" class="held"></ul>
+        </details>
+
         <details id="recovery-restore">
           <summary>Restore from a recovery code</summary>
           <label>

@@ -12,7 +12,7 @@ jobs:
   rust:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # No toolchain version here on purpose: rust-toolchain.toml is the single
       # source of truth, so CI and every developer compile with the same rustc.
       # A floating "stable" would silently re-key the delegate on each Rust
@@ -44,7 +44,7 @@ jobs:
   wasm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: install the pinned toolchain
         run: rustup show          # rust-toolchain.toml carries the wasm target
       - uses: Swatinem/rust-cache@v2
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: wasm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22

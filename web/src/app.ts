@@ -128,6 +128,80 @@ async function revealRecovery() {
   }
 }
 
+/// Look for an identity left behind by an earlier delegate generation.
+///
+/// Deliberately a button rather than something that runs on load. Adopting one
+/// raises two consent prompts, and a prompt nobody asked for is how people
+/// learn to click through prompts.
+async function findPrevious() {
+  if (!ante) return;
+  const btn = $("previous-find") as HTMLButtonElement;
+  const status = $("previous-status");
+  const list = $("previous-list");
+  btn.disabled = true;
+  status.hidden = false;
+  status.textContent = "asking earlier versions…";
+  list.innerHTML = "";
+
+  try {
+    const search = await ante.findStrandedIdentities(deployments.delegate.superseded);
+
+    if (search.found.length === 0) {
+      status.textContent =
+        search.unresponsive.length > 0
+          ? // Not "nothing found": a version this node never had looks exactly
+            // like one that is broken, and neither proves an absence.
+            `no earlier identity found — ${search.unresponsive.length} version${search.unresponsive.length === 1 ? "" : "s"} did not answer, which may just mean this node never had ${search.unresponsive.length === 1 ? "it" : "them"}`
+          : "no earlier identity on this node";
+      return;
+    }
+
+    status.textContent = `found ${search.found.length}`;
+    for (const hit of search.found) {
+      const li = document.createElement("li");
+      const label = document.createElement("code");
+      label.textContent = fingerprint(hit.verifyingKey);
+      const take = document.createElement("button");
+      take.textContent = "Use this identity";
+      take.addEventListener("click", () => void adoptPrevious(hit, take, status));
+      li.append(label, take);
+      list.appendChild(li);
+    }
+  } catch (err) {
+    status.textContent = `failed: ${(err as Error).message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function adoptPrevious(
+  hit: { delegate: { key: string; codeHash: string }; verifyingKey: Uint8Array },
+  btn: HTMLButtonElement,
+  status: HTMLElement,
+) {
+  if (!ante) return;
+  btn.disabled = true;
+  status.textContent = "approve both prompts on your node…";
+  try {
+    const outcome = await ante.adoptStrandedIdentity(hit.delegate);
+    if (outcome.kind === "denied") {
+      status.textContent = "cancelled — your identity is unchanged";
+      return;
+    }
+    showIdentity(outcome.verifyingKey);
+    currentLevel = null;
+    $("previous-list").innerHTML = "";
+    status.textContent = `recovered — this device is now ${fingerprint(outcome.verifyingKey)}`;
+    await refreshLevel();
+    void refreshGrants();
+    void sweepPredecessors();
+  } catch (err) {
+    status.textContent = `failed: ${(err as Error).message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function previewRestore() {
   const raw = ($("restore-input") as HTMLTextAreaElement).value.trim();
   const preview = $("restore-preview");
@@ -395,6 +469,7 @@ function wireStaticHandlers() {
   ($("improve-bits") as HTMLInputElement).addEventListener("input", updateImproveLabel);
   $("improve-go").addEventListener("click", () => void runImprove());
   $("recovery-reveal").addEventListener("click", () => void revealRecovery());
+  $("previous-find").addEventListener("click", () => void findPrevious());
   ($("restore-input") as HTMLTextAreaElement).addEventListener("input", previewRestore);
   $("restore-go").addEventListener("click", () => void runRestore());
   $("action-go").addEventListener("click", () => void runAction());

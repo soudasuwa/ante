@@ -20,6 +20,7 @@ import {
 } from "./delegate-msg";
 import type { FreenetClient } from "./freenet";
 import { powBits, type Solution } from "./pow";
+import { bytesEqual, hexToBytes } from "./util";
 import PowWorker from "./pow-worker?worker&inline";
 import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
 
@@ -85,6 +86,32 @@ export interface GrindSession {
   stop(): void;
 }
 
+/// A delegate generation this one replaced. Addressing it needs no WASM:
+/// freenet-core retains delegate code indefinitely (only an explicit
+/// `UnregisterDelegate` removes it), so a generation the node once registered
+/// is still reachable by its key.
+export interface PreviousDelegate {
+  /// blake3(code_hash) — hex.
+  key: string;
+  /// blake3(wasm) — hex.
+  codeHash: string;
+}
+
+export interface StrandedIdentity {
+  delegate: PreviousDelegate;
+  /// The identity that generation still holds.
+  verifyingKey: Uint8Array;
+}
+
+export interface StrandedSearch {
+  /// Generations holding an identity that is not the current one.
+  found: StrandedIdentity[];
+  /// Generations that did not answer. A delegate this node never registered is
+  /// indistinguishable from a broken one — both look like silence, and neither
+  /// is evidence that nothing is there. Surface it; do not treat it as empty.
+  unresponsive: PreviousDelegate[];
+}
+
 export class AnteClient {
   private constructor(
     private readonly client: FreenetClient,
@@ -121,6 +148,77 @@ export class AnteClient {
     const challenge = await this.challenge(purpose);
     const nonce = await grindInWorker(challenge, minBits, opts.onProgress);
     return this.signCommit(purpose, nonce, minBits, opts.onPrompt);
+  }
+
+  /// Look for an identity stranded in an earlier delegate generation.
+  ///
+  /// A delegate's key is `blake3(blake3(wasm))`, and the identity seed lives in
+  /// a secret namespace keyed by it — so changing the delegate leaves the old
+  /// identity intact but unreachable from the new one. This finds it.
+  ///
+  /// Costs no prompt: `GetIdentity` never raises one. It does *create* an
+  /// identity in a previous generation that is registered but empty, which is
+  /// harmless — that generation is already retired — but it is why this is
+  /// worth calling only when the user asks.
+  async findStrandedIdentities(previous: readonly PreviousDelegate[]): Promise<StrandedSearch> {
+    const current = await this.identity();
+    const search: StrandedSearch = { found: [], unresponsive: [] };
+
+    for (const gen of previous) {
+      const address: DelegateAddress = {
+        keyBytes: Array.from(hexToBytes(gen.key)),
+        codeHashBytes: Array.from(hexToBytes(gen.codeHash)),
+      };
+      try {
+        const reply = await sendToDelegate(this.client, address, cborEncode("GetIdentity"));
+        if (reply.payloads.length === 0) {
+          search.unresponsive.push(gen);
+          continue;
+        }
+        const parsed = enumVariant(cborDecode(reply.payloads[0]));
+        if (parsed.variant !== "Identity") {
+          search.unresponsive.push(gen);
+          continue;
+        }
+        const vk = asBytes(mapGet(parsed.fields!, "verifying_key"));
+        if (!bytesEqual(vk, current)) search.found.push({ delegate: gen, verifyingKey: vk });
+      } catch {
+        search.unresponsive.push(gen);
+      }
+    }
+    return search;
+  }
+
+  /// Move an identity from an earlier generation into this one.
+  ///
+  /// Two prompts, and both are correct: the old generation must agree to reveal
+  /// its seed, and the current one must agree to replace what it holds. Neither
+  /// can be skipped — a delegate that handed its secrets to another on request
+  /// would be a hole, not a feature.
+  async adoptStrandedIdentity(
+    from: PreviousDelegate,
+    opts: PromptOptions = {},
+  ): Promise<ImportOutcome> {
+    const address: DelegateAddress = {
+      keyBytes: Array.from(hexToBytes(from.key)),
+      codeHashBytes: Array.from(hexToBytes(from.codeHash)),
+    };
+    opts.onPrompt?.();
+    const reply = await sendToDelegate(
+      this.client,
+      address,
+      cborEncode("ExportIdentity"),
+      PROMPT_TIMEOUT_MS,
+    );
+    if (reply.payloads.length === 0) throw new Error("the earlier version did not answer");
+    const parsed = enumVariant(cborDecode(reply.payloads[0]));
+    if (parsed.variant === "Denied") return { kind: "denied" };
+    if (parsed.variant === "Error") {
+      throw new Error(`earlier version: ${asString(mapGet(parsed.fields!, "message"))}`);
+    }
+    expect(parsed.variant, "IdentitySeed");
+    const seed = asBytes(mapGet(parsed.fields!, "seed"));
+    return this.importIdentity(seed, opts);
   }
 
   /// Start an open-ended grind and hand back a handle. Unlike `commit`, which

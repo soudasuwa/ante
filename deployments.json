@@ -1,5 +1,5 @@
 {
-  "_comment": "Single source of truth for every live address. Read at BUILD TIME by the apps that link to each other, and checked against DEPLOYMENTS.md in CI. Never read at runtime: an address that can come from the URL lets a crafted link show attacker data under a genuine address (WHITEPAPER.md \u00a715). `superseded` is the migration lineage, newest first: the instance ids a carry-forward probe GETs to recover state stranded by a re-key. Appended automatically by the publish scripts \u2014 a generation missing here cannot be migrated from.",
+  "_comment": "Single source of truth for every live address. Read at BUILD TIME by the apps that link to each other, and checked against DEPLOYMENTS.md in CI. Never read at runtime: an address that can come from the URL lets a crafted link show attacker data under a genuine address (WHITEPAPER.md \u00a715). `superseded` is the migration lineage, newest first: the instance ids a carry-forward probe GETs to recover state stranded by a re-key. Appended automatically by the publish scripts \u2014 a generation missing here cannot be migrated from. `delegate.superseded` lets the vault find an identity stranded by a delegate re-key: freenet-core retains delegate WASM indefinitely, so an older generation the node once registered is still addressable by its key \u2014 nothing needs to be re-shipped.",
   "sites": {
     "home": {
       "title": "ante",
@@ -38,5 +38,18 @@
         "Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9"
       ]
     }
+  },
+  "delegate": {
+    "current": {
+      "key": "84b825053c1560bcdc7a7a1a3e08096e8b5d231f0af3a30e887ca1f18adf0411",
+      "codeHash": "3b831048a0dd20f8efa5793cecad59f949f2c68a3fea81ffa958613d7436efcb"
+    },
+    "superseded": [
+      {
+        "key": "3631e9328860295d00526b3ee1535bce5c5f6bf8afe3aa2624aff5e36b074915",
+        "codeHash": "92372684b18ad42d7762138351eeab49344cd378c0b3f39da1a4b23603b05d94",
+        "note": "pre reproducible-build fix"
+      }
+    ]
   }
 }
