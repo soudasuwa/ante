@@ -1073,11 +1073,22 @@ Roughly in priority order.
    why it accumulates as a side effect of the rituals rather than depending on
    anyone's memory.
 
-8. **A fixed-path (containerised) build**, so a third party can rebuild the
-   delegate and confirm the published key. A `Dockerfile` with a fixed
-   `WORKDIR` is the remaining fix; cargo's `-C metadata` hashes a path
-   dependency's absolute path, so the build is still only same-path
-   reproducible.
+8. **A fixed-path (containerised) build — done (2026-09-07).** `build/Dockerfile`
+   builds at a fixed `WORKDIR`, `CARGO_HOME` and `RUSTUP_HOME`, which is what
+   cargo's `-C metadata` needed: it hashes a path dependency's absolute path,
+   and no `--remap-path-prefix` reaches that, so before this the keys were only
+   ever verifiable on the machine that made them. Verified by building the same
+   source from two different host directories, once with `--no-cache`, and
+   getting identical keys. CI now runs `./scripts/build-in-container.sh --check`
+   on every push, so the committed record is checked by something that is not
+   the publisher's laptop.
+
+   One trap worth carrying to any project that copies this: the build scripts
+   remap `$WORKTREE_DIR` to the literal `/ante` and `$CARGO_HOME/registry/src`
+   to `/cargo-registry`, then grep the artifact for the real paths to prove
+   nothing machine-specific leaked. **No real path may equal a remap target** —
+   `WORKDIR=/ante` makes that grep match its own remapped output and fail a
+   build that is perfectly clean.
 
    **Half of this was not a missing feature but a live defect, fixed
    2026-09-07.** `--remap-path-prefix=$RUSTUP_HOME=/rustup` preserves the

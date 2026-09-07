@@ -52,10 +52,16 @@ WebSocket API; there is nothing to render.
 
 | Contract | Instance | Parameters | Publish |
 |---|---|---|---|
-| ante-registry | `FxrfzJC3pwTdRg9gNY2Nhj34FnHsXyGDCVzbJXxL7zaz` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
-| guestbook example | `EXsqzKvKBJJ5BD69LQPXJERXQpUNCn8L1TPEHAoDRofd` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
+| ante-registry | `GJefZKcv5zUGCmQ6oMYYfNzfK7rwZQ73VuBXBVTmHL9m` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
+| guestbook example | `HtGCAKDGRxwP5oEifcBBzuZT9iPReZMkyEByaqsJ9Bug` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
 
-Both moved on 2026-09-07. The build was found to be non-reproducible — the
+Both moved twice on 2026-09-07, and this is the last time they should move for
+a build reason. The first move fixed a non-reproducible build; the second
+adopted the fixed-path container build as canonical, which changes the bytes one
+final time and makes the keys independent of where the repo lives. From here
+CI verifies the record on every push. Detail on the first move follows.
+
+The build was found to be non-reproducible — the
 toolchain's *installation directory name* leaked into every artifact, so the
 same compiler installed under two names produced two different addresses — and
 fixing that changed the bytes, which changes the address. The previous
@@ -63,7 +69,7 @@ generations are recorded in `deployments.json` under `superseded`, and both apps
 sweep them on load to carry levels and posts forward. They stay readable;
 nothing was deleted.
 
-The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`EXsqz…`).
+The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`HtGCA…`).
 Two different ids for one example — that is the normal shape of a Freenet app,
 not a quirk of this one.
 
@@ -74,7 +80,7 @@ the existing instance without republishing:
 
 ```bash
 ./scripts/gen-embedded.sh ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm \
-  FxrfzJC3pwTdRg9gNY2Nhj34FnHsXyGDCVzbJXxL7zaz
+  GJefZKcv5zUGCmQ6oMYYfNzfK7rwZQ73VuBXBVTmHL9m
 ```
 
 ## Who can move a pointer
