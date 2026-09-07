@@ -13,7 +13,7 @@ use ante_core::{
 };
 use ed25519_dalek::SigningKey;
 
-const PURPOSE: &str = "ante:identity-level:v1";
+const PURPOSE: &str = "ante:identity-level:v2";
 
 fn params() -> RegistryParameters {
     RegistryParameters {

@@ -16,16 +16,18 @@ It is the step between *no effort at all to sybil* and *needs a ghost key*. A
 proof shows a key cost something. It does **not** show the key is unique,
 human-held, or not one of many an attacker made — see `DESIGN.md`.
 
-### The guestbook starts empty
+### Everything starts empty
 
-Its purpose is `ante-guestbook:post:v2`, a fresh instance published at launch so
-the public book does not open full of pre-release test posts. Freenet state is a
-grow-only CRDT — there is no delete — so a new address is the only clean slate,
-and the guestbook's predecessor list is deliberately empty: leaving it would have
-the carry-forward sweep restore every test post it was meant to leave behind.
+Both contracts were reset at launch, to `ante-guestbook:post:v2` and
+`ante:identity-level:v2`. Freenet state is a grow-only CRDT — there is no delete
+— so a new address is the only clean slate. These are parameter changes, not
+code changes, so no WASM moved and no key was re-keyed.
 
-The registry keeps its full lineage. Identity levels are worth carrying forward,
-and a level is not spam.
+Every predecessor list is deliberately empty, which is the opposite of the usual
+rule. The carry-forward sweeps work, and would have faithfully restored the
+pre-release test posts and test identity levels the reset existed to drop. So
+nothing published before launch is reachable by the apps: it remains at its old
+address, readable by anyone who knows it, and is no longer swept forward.
 
 ### Live on Freenet
 

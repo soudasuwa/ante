@@ -19,7 +19,7 @@ export const MAX_PURPOSE_BYTES = 256;
 
 /// The purpose string the identity-level registry pins. A proof for this is a
 /// portable "this identity is worth at least N bits" statement.
-export const IDENTITY_LEVEL_PURPOSE = "ante:identity-level:v1";
+export const IDENTITY_LEVEL_PURPOSE = "ante:identity-level:v2";
 
 export interface AnteProof {
   identityVk: Uint8Array; // 32 bytes

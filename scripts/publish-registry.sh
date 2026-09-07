@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRACT_DIR="$REPO_ROOT/contracts/ante-registry"
 DELEGATE_WASM="$REPO_ROOT/ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm"
 
-PURPOSE="${ANTE_REGISTRY_PURPOSE:-ante:identity-level:v1}"
+PURPOSE="${ANTE_REGISTRY_PURPOSE:-ante:identity-level:v2}"
 FLOOR="${ANTE_REGISTRY_FLOOR:-12}"
 FDEV_ARGS="${FDEV_ARGS:-}"
 

@@ -1,7 +1,7 @@
 //! Emit the CBOR parameters blob for an `ante-registry` instance.
 //!
 //! Usage: `registry-params [--purpose <str>] [--floor <bits>] [--out <path>]`
-//! Defaults: purpose `ante:identity-level:v1`, floor `12`.
+//! Defaults: purpose `ante:identity-level:v2`, floor `12`.
 //!
 //! Without `--out`: prints `hex <hex>` and `bytes <json-array>` to stdout.
 //! With `--out <path>`: writes the raw CBOR bytes to that file (what
@@ -12,7 +12,7 @@ use std::io::Write;
 use ante_core::registry::RegistryParameters;
 
 fn main() {
-    let mut purpose = "ante:identity-level:v1".to_string();
+    let mut purpose = "ante:identity-level:v2".to_string();
     let mut floor: u32 = 12;
     let mut out: Option<String> = None;
 

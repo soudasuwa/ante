@@ -184,7 +184,7 @@ GB_WASM="$REPO_ROOT/examples/guestbook/contract/target/wasm32-unknown-unknown/re
 [ -f "$GB_WASM" ]  || (cd "$REPO_ROOT/examples/guestbook/contract" && "$REPO_ROOT/scripts/build-contract.sh")
 
 cargo run -q --manifest-path "$REPO_ROOT/Cargo.toml" -p registry-params -- \
-  --purpose "${ANTE_REGISTRY_PURPOSE:-ante:identity-level:v1}" \
+  --purpose "${ANTE_REGISTRY_PURPOSE:-ante:identity-level:v2}" \
   --floor "${ANTE_REGISTRY_FLOOR:-12}" --out "$WORK/reg.params" >/dev/null
 (cd "$REPO_ROOT/examples/guestbook/contract" && cargo run -q --example params -- \
   --purpose "${ANTE_GUESTBOOK_PURPOSE:-ante-guestbook:post:v2}" \

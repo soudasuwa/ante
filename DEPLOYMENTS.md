@@ -52,10 +52,34 @@ WebSocket API; there is nothing to render.
 
 | Contract | Instance | Parameters | Publish |
 |---|---|---|---|
-| ante-registry | `GJefZKcv5zUGCmQ6oMYYfNzfK7rwZQ73VuBXBVTmHL9m` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
+| ante-registry | `6qj2bKS2Ns6xGnZ72eXsRSRsHcpzNZMxrPuacFYNtnPs` | purpose `ante:identity-level:v2`, floor 12 bits | `./scripts/publish-registry.sh` |
 | guestbook example | `DAGX9qjonjTPFyfLP9rEsJtzT9XSuFBEWeaxc9WVPZu8` | purpose `ante-guestbook:post:v2`, min_bits 16 | `./scripts/publish-guestbook.sh` |
 
-**The guestbook was reset for launch (2026-09-07).** Its purpose moved to
+**Everything was reset for launch (2026-09-07): a clean slate, on purpose.**
+
+Freenet state is a grow-only CRDT, so there is no delete and the only clean slate
+is a new address. Both contracts moved to `:v2` purposes — a parameter change,
+so a new instance without touching any WASM, which is why the delegate and
+contract KEYS are unchanged and nothing was re-keyed.
+
+Every `superseded` list in deployments.json is deliberately EMPTY. That is the
+opposite of the usual rule, and it needed doing by hand after publishing,
+because the publish scripts record lineage automatically and correctly. Leaving
+the entries would have the carry-forward sweeps faithfully restore the very
+pre-release test data the reset existed to drop.
+
+What that costs, stated plainly: nothing published before launch can be reached
+by the apps any more. Old test posts and test identity levels stay at their old
+addresses, readable by anyone who knows them, but no longer swept forward. The
+delegate lineage is empty too, so the vault no longer offers to recover a
+pre-launch identity — nobody outside the authors has one, and the alternative
+was three pointless probes on every load forever.
+
+The key HISTORY is untouched: artifact-keys.toml keeps every superseded
+artifact, because that record is about what bytes were ever published, which is
+a different question from what the apps should read today.
+
+**The guestbook, specifically.** Its purpose moved to
 `ante-guestbook:post:v2`, which is a new instance and therefore an empty book —
 Freenet state is a grow-only CRDT, so there is no delete, and a fresh address is
 the only clean slate. Its `superseded` list is deliberately EMPTY: leaving the
@@ -67,9 +91,6 @@ That is the one case where dropping a predecessor is correct. Everywhere else it
 is data a future migration cannot reach, which is why the publish scripts record
 lineage automatically — the entry here had to be removed by hand, after
 publishing, on purpose.
-
-The registry keeps its full lineage: identity levels are worth carrying, and a
-level is not spam.
 
 Both moved twice on 2026-09-07, and this is the last time they should move for
 a build reason. The first move fixed a non-reproducible build; the second
@@ -96,7 +117,7 @@ the existing instance without republishing:
 
 ```bash
 ./scripts/gen-embedded.sh ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm \
-  GJefZKcv5zUGCmQ6oMYYfNzfK7rwZQ73VuBXBVTmHL9m
+  6qj2bKS2Ns6xGnZ72eXsRSRsHcpzNZMxrPuacFYNtnPs
 ```
 
 ## Who can move a pointer
