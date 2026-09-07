@@ -88,6 +88,27 @@ textarea:disabled {
   border-style: dashed;
 }
 
+/* The target sits on the same line as the button it qualifies, for the same
+   reason the guestbook's commitment level does: it is not a property of your
+   identity, it is a term on the act of proving it. The base `label` rule is
+   `display: block` for the stacked form fields, so the row has to be asked for
+   explicitly. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.25rem;
+}
+.level-pick {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  color: var(--muted);
+}
+
 /* Inline number inputs (e.g. "Grind to [N] bits"). */
 label input[type="number"] {
   width: 4.5rem;

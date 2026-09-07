@@ -36,18 +36,21 @@
         </dl>
         <p id="sweep-status" class="progress" hidden></p>
 
-        <label>
-          Grind to at least
-          <input type="number" id="improve-bits" min="1" max="32" step="1" value="18" />
-          bits
-        </label>
         <p class="muted">
           Each extra bit roughly doubles the work (in your browser: ~18 a
           second or two, ~20 around ten seconds, ~24 a minute or more). The
           grind often clears a bit or two past your target — that's your real
-          level. The registry only ever raises it, so aim above where you are.
+          level. The registry only ever raises a level, so the lowest you can
+          aim for is one bit above where you already are.
         </p>
-        <button id="improve-go" class="primary">Prove identity</button>
+        <div class="actions">
+          <button id="improve-go" class="primary">Prove identity</button>
+          <label for="improve-bits" class="level-pick">
+            at least
+            <input type="number" id="improve-bits" min="1" max="32" step="1" value="18" />
+            bits
+          </label>
+        </div>
         <p id="improve-progress" class="progress" hidden></p>
       </section>
 

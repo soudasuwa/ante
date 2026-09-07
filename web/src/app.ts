@@ -347,7 +347,15 @@ function renderLevel() {
   $("id-level").textContent =
     currentLevel === null ? (registry ? "unproven" : "not tracked") : `${currentLevel} bits`;
 
-  const floor = (currentLevel ?? 0) + 1;
+  // Two floors, and the lower of them is not a floor at all. The registry only
+  // ever raises a level, so anything at or below the current one is work that
+  // changes nothing — hence current + 1. But it also refuses proofs under its
+  // own parameter floor, so for an identity with no level yet the real minimum
+  // is that, not 1: offering 1 would let someone grind a proof the contract
+  // then rejects, and the wasted work is exactly what asking-first exists to
+  // prevent.
+  const registryFloor = deployments.contracts.registry.minBits;
+  const floor = Math.max((currentLevel ?? 0) + 1, registryFloor);
   const input = $("improve-bits") as HTMLInputElement;
   input.min = String(floor);
   input.max = String(MAX_BITS);
