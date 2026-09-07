@@ -7,7 +7,7 @@ import { asBytes, cborDecode, cborEncode, mapGet } from "./cbor";
 import { ANTE_REGISTRY_CONTRACT_ID } from "./embedded";
 import { contractKeyFromId, FreenetClient } from "./freenet";
 import { bytesEqual } from "./util";
-import { migrateRegistry, type MigrationReport } from "./migrate";
+import { migrateRegistry, type RegistryMigrationReport } from "./migrate";
 import { anteProofToCborValue } from "./ante-proof";
 
 export { ANTE_REGISTRY_CONTRACT_ID } from "./embedded";
@@ -51,7 +51,8 @@ export class RegistryClient {
   async carryForward(
     predecessors: readonly string[],
     minBitsFloor: number,
-  ): Promise<MigrationReport> {
+    self?: Uint8Array,
+  ): Promise<RegistryMigrationReport> {
     return migrateRegistry(
       this.client,
       ANTE_REGISTRY_CONTRACT_ID,
@@ -61,6 +62,7 @@ export class RegistryClient {
         const delta = cborEncode({ proofs: proofs.map(anteProofToCborValue) });
         await this.client.updateContractDelta(this.key, delta);
       },
+      self,
     );
   }
 

@@ -160,21 +160,39 @@ export async function probeGenerations<T>(
 }
 
 /// The registry's carry-forward: identity levels.
+///
+/// `self` is the identity held on THIS device, if any. The sweep carries every
+/// proof it finds, for every identity — that is the point of it, and it is safe
+/// because the contract re-validates each one on the way in. But that makes
+/// `carried` a fact about the network, not about the person looking at the
+/// screen, and a UI that reports it as "recovered N levels" tells them their
+/// levels came back when nothing of theirs was involved. `carriedSelf` is the
+/// only part of the report that is about them.
 export async function migrateRegistry(
   client: FreenetClient,
   current: string,
   predecessors: readonly string[],
   minBits: number,
   submit: (proofs: AnteProof[]) => Promise<void>,
-): Promise<MigrationReport> {
-  return probeGenerations<AnteProof>(client, current, predecessors, {
+  self?: Uint8Array,
+): Promise<RegistryMigrationReport> {
+  let carriedSelf = false;
+  const report = await probeGenerations<AnteProof>(client, current, predecessors, {
     decode: (bytes) => {
       const all = allProofsIn(bytes);
       const carryable = all.filter((p) => verifyAnteProof(p, minBits).ok);
+      if (self && carryable.some((p) => bytesMatch(p.identityVk, self))) carriedSelf = true;
       return { carryable, dropped: all.length - carryable.length };
     },
     submit,
   });
+  return { ...report, carriedSelf };
+}
+
+export interface RegistryMigrationReport extends MigrationReport {
+  /// Whether one of the carried proofs belongs to this device's identity.
+  /// False when the sweep only moved other people's records forward.
+  carriedSelf: boolean;
 }
 
 /// Every proof a registry state holds, filed under its own key. Validity

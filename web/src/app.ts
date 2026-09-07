@@ -73,18 +73,27 @@ async function sweepPredecessors() {
   const previous = deployments.contracts.registry.superseded;
   if (!registry || previous.length === 0) return;
 
-  // Silent unless there is something the user can act on. An automatic sweep
-  // that announces itself to everyone is noise: a first-time visitor has no
-  // earlier registries and does not need to hear about a search for them, and
-  // "did not answer" is a fact about the network the user cannot do anything
-  // with — the sweep already retries on the next load. Report a recovery,
-  // nothing else.
+  // Silent unless something happened to YOU. The sweep carries every proof it
+  // finds, for every identity — so `carried` counts other people's records as
+  // readily as your own, and reporting it in a panel headed "Your identity"
+  // told a brand-new user that 5 levels had been "recovered" while their own
+  // level still read unproven. Both statements were true and the pair was
+  // nonsense. Only `carriedSelf` is about the person reading the screen.
+  //
+  // The rest stays silent for the reason it always did: a first-time visitor
+  // does not need to hear about a search for records they never had, and "did
+  // not answer" is a fact about the network they cannot act on — the sweep
+  // already retries on the next load.
   const status = $("sweep-status");
   try {
-    const r = await registry.carryForward(previous, deployments.contracts.registry.minBits);
-    if (r.carried > 0) {
+    const r = await registry.carryForward(
+      previous,
+      deployments.contracts.registry.minBits,
+      identityVk ?? undefined,
+    );
+    if (r.carriedSelf) {
       status.hidden = false;
-      status.textContent = `recovered ${r.carried} level${r.carried === 1 ? "" : "s"} from an earlier registry`;
+      status.textContent = "your level was carried forward from an earlier registry";
       await refreshLevel();
     }
   } catch {

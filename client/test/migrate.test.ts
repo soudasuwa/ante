@@ -53,6 +53,47 @@ describe("registry carry-forward probe", () => {
     expect(submitted[0][0].identityVk).toEqual(proof.identityVk);
   });
 
+  // The distinction that a UI got wrong: `carried` counts everyone's records,
+  // so a brand-new user was told 5 levels had been "recovered" while their own
+  // level still read unproven. Only carriedSelf is about the person looking.
+  it("reports carriedSelf false when the sweep only moved other identities", async () => {
+    const stranger = new Uint8Array(32).fill(9);
+    const report = await migrateRegistry(
+      client({ old1: stateWith(proof) }),
+      "current",
+      ["old1"],
+      12,
+      async () => {},
+      stranger,
+    );
+    expect(report.carried).toBe(1);
+    expect(report.carriedSelf).toBe(false);
+  });
+
+  it("reports carriedSelf true when one of the carried proofs is ours", async () => {
+    const report = await migrateRegistry(
+      client({ old1: stateWith(proof) }),
+      "current",
+      ["old1"],
+      12,
+      async () => {},
+      proof.identityVk,
+    );
+    expect(report.carriedSelf).toBe(true);
+  });
+
+  it("reports carriedSelf false when no identity is held on this device", async () => {
+    const report = await migrateRegistry(
+      client({ old1: stateWith(proof) }),
+      "current",
+      ["old1"],
+      12,
+      async () => {},
+    );
+    expect(report.carried).toBe(1);
+    expect(report.carriedSelf).toBe(false);
+  });
+
   it("treats a timeout as unresolved, NOT as empty", async () => {
     const report = await migrateRegistry(
       client({ slow: "hang" }),
