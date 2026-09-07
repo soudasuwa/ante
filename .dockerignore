@@ -1,0 +1,10 @@
+# Keep the build context small and, more importantly, DETERMINISTIC: a stray
+# target/ or node_modules from the host must never reach a build whose whole
+# purpose is producing the same bytes everywhere.
+**/target/
+**/node_modules/
+**/dist/
+.git/
+build/out/
+.artifact-build-stamp
+client/src/embedded.ts

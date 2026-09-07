@@ -52,9 +52,14 @@ GUESTBOOK_WASM="$REPO_ROOT/examples/guestbook/contract/target/wasm32-unknown-unk
 #
 # The toolchain identity is therefore part of the cache key. When it changes,
 # the target directories go, and everything is rebuilt from source.
+# Publishing uses artifacts built in the container (the canonical build), so the
+# record must be taken from THOSE bytes, not from a host rebuild that would
+# overwrite them with different ones. Set when the WASM is already in place.
+SKIP_BUILD="${ANTE_SKIP_BUILD:-}"
+
 STAMP="$REPO_ROOT/.artifact-build-stamp"
 TOOLCHAIN_ID="$(rustc -vV | tr '\n' ' ')|$(rustc --print sysroot)"
-if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$TOOLCHAIN_ID" ]; then
+if [ -z "$SKIP_BUILD" ] && { [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$TOOLCHAIN_ID" ]; }; then
   [ -f "$STAMP" ] && echo "toolchain changed since the last build — rebuilding from scratch" >&2
   rm -rf "$REPO_ROOT/ante-delegate/target" \
          "$REPO_ROOT/contracts/ante-registry/target" \
@@ -63,6 +68,10 @@ if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$TOOLCHAIN_ID" ]; then
 fi
 
 build() {
+  if [ -n "$SKIP_BUILD" ]; then
+    echo "using the existing $1 WASM (ANTE_SKIP_BUILD)" >&2
+    return 0
+  fi
   echo "building $1…" >&2
   case "$1" in
     delegate)  "$REPO_ROOT/scripts/build-delegate.sh" >/dev/null ;;

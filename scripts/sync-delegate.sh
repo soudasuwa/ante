@@ -9,7 +9,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WASM="$REPO_ROOT/ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm"
 
-"$REPO_ROOT/scripts/build-delegate.sh"
+if [ -n "${ANTE_SKIP_BUILD:-}" ]; then
+  echo "using the existing delegate WASM (ANTE_SKIP_BUILD)"
+else
+  "$REPO_ROOT/scripts/build-delegate.sh"
+fi
 
 # Report a re-key rather than failing: local iteration on the delegate re-keys
 # on every edit, and that is expected. CI runs the same check as a hard gate,

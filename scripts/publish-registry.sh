@@ -19,8 +19,12 @@ command -v fdev >/dev/null || {
   exit 1
 }
 
-echo "building the contract WASM (reproducible)…"
-(cd "$CONTRACT_DIR" && "$REPO_ROOT/scripts/build-contract.sh")
+if [ -n "${ANTE_SKIP_BUILD:-}" ]; then
+  echo "using the existing contract WASM (ANTE_SKIP_BUILD)"
+else
+  echo "building the contract WASM (reproducible)…"
+  (cd "$CONTRACT_DIR" && "$REPO_ROOT/scripts/build-contract.sh")
+fi
 WASM="$CONTRACT_DIR/target/wasm32-unknown-unknown/release/ante_registry_contract.wasm"
 
 PARAMS="$(mktemp)"
