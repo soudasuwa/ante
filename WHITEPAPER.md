@@ -256,8 +256,14 @@ text into a consent prompt or a stored proof.
 ### 4.5 What a proof does *not* bind — the sharpest footgun
 
 A proof commits to `(identity_vk, purpose, nonce, ts)`. **That is the complete
-list.** In particular it says nothing about the action it was minted for, and
-this is the mistake we actually shipped.
+list**, and `purpose` is the only field in it an application controls — so a
+proof binds to exactly what you put in the purpose string, and to nothing else.
+
+The footgun is that a purpose reads as though it already identifies the action
+when it usually names only the *kind* of one. `myapp:post:v1` says "this was
+minted for posting", not "this was minted for **this** post". Nothing in the
+protocol carries the second, and the gap between the two is the mistake we
+actually shipped.
 
 The guestbook originally used one fixed `purpose` for every post. Three
 consequences, none obvious in isolation and jointly fatal:
@@ -289,11 +295,15 @@ own challenge and requires its own search.
 This is the same mechanism §3 prescribes for freshness (`myapp:comment:2026-W12`).
 The purpose string is the *only* place an application can express what a proof
 is for, so the design question for any consumer is: **what could an attacker
-re-use this proof for, and is that in the purpose?**
+re-use this proof for, and is that in the purpose?** Anything outside it is not
+bound, however obviously the proof "belongs" to the thing it arrived with.
 
-A per-identity *level* is the deliberate exception — `ante:identity-level:v1` is
-fixed precisely because re-grinding it should re-find the same proof. You are
-claiming a standing property, not paying for an action.
+A per-identity *level* is the deliberate exception — `ante:identity-level:v2` is
+fixed, with no instance folded in, precisely because re-grinding it should
+re-find the same proof. There the standing property IS the whole claim: you are
+asserting something about the key itself, not paying for an action, so a proof
+that transfers across every occasion is the correct behaviour rather than a
+leak.
 
 ---
 
@@ -588,7 +598,7 @@ it means every app that wants to know "is this identity established" triggers a
 fresh grind.
 
 The registry is a contract holding, per identity, the best proof it has
-published for one canonical purpose (`ante:identity-level:v1`). An identity
+published for one canonical purpose (`ante:identity-level:v2`). An identity
 grinds once and publishes; any app reads a level with a plain contract GET and
 no grind at all.
 
@@ -1133,7 +1143,7 @@ Roughly in priority order.
 CHALLENGE_CONTEXT      b"ante:pow-challenge:v1"
 SIGNING_CONTEXT        b"ante:proof-signature:v1"
 MAX_PURPOSE_BYTES      256
-IDENTITY_LEVEL_PURPOSE "ante:identity-level:v1"
+IDENTITY_LEVEL_PURPOSE "ante:identity-level:v2"
 
 challenge_bytes  = CHALLENGE_CONTEXT ‖ len(purpose) u32le ‖ purpose ‖ identity_vk
 digest           = blake3(challenge_bytes ‖ nonce u64le)
@@ -1172,6 +1182,13 @@ ordering makes identical states look different forever.
 ## Appendix B: Pinned test vector
 
 Any reimplementation must reproduce these exactly.
+
+Note the purpose below is `ante:identity-level:v1`, not the `:v2` the live
+registry uses. That is deliberate and must stay: this vector pins the *encoding*
+— the challenge layout, the signing preimage, the CBOR — and the hex under it
+commits to every byte including that string. Bumping it to match a deployment
+would invalidate the vector while proving nothing about the format. The purpose
+here is test data; which purpose the registry happens to use is configuration.
 
 ```
 seed            2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a
