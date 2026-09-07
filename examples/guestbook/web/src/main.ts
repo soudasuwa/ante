@@ -166,9 +166,12 @@ function setComposeState(state: "idle" | "grinding" | "posting") {
   }
 }
 
-function renderGrind(bits: number | null, elapsed: number) {
+function renderGrind(bits: number | null, elapsed: number, tried = 0) {
   const post = $("post") as HTMLButtonElement;
-  $("grind-elapsed").textContent = `${elapsed.toFixed(0)}s`;
+  // Show the hash count next to the bit count: expected work for N bits is 2^N,
+  // so the two together are a sanity check anyone can do by eye.
+  $("grind-elapsed").textContent =
+    `${elapsed.toFixed(0)}s · ${tried.toLocaleString()} hashes`;
 
   if (bits === null || bits < GUESTBOOK_MIN_BITS) {
     $("grind-bits").textContent = "…";
@@ -207,7 +210,9 @@ async function startGrinding() {
   setComposeState("grinding");
   renderGrind(null, 0);
   try {
-    session = await startPostGrind(ante, (p) => renderGrind(p.best?.bits ?? null, p.elapsed));
+    session = await startPostGrind(ante, (p) =>
+      renderGrind(p.best?.bits ?? null, p.elapsed, p.tried),
+    );
   } catch (err) {
     $("progress").hidden = false;
     $("progress").textContent = `failed: ${(err as Error).message}`;

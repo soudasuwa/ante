@@ -19,7 +19,7 @@ import {
   type DelegateAddress,
 } from "./delegate-msg";
 import type { FreenetClient } from "./freenet";
-import type { Solution } from "./pow";
+import { powBits, type Solution } from "./pow";
 import PowWorker from "./pow-worker?worker&inline";
 import type { PowWorkerMessage, PowWorkerRequest } from "./pow-worker";
 
@@ -151,7 +151,16 @@ export class AnteClient {
 
     worker.onmessage = (event: MessageEvent<PowWorkerMessage>) => {
       const msg = event.data;
-      if (msg.type === "best") best = { nonce: msg.nonce, bits: msg.bits };
+      if (msg.type === "best") {
+        // Never trust the worker's own bit count. Re-derive it here from the
+        // same challenge, with the same function the verifier uses, so the
+        // number shown to a user is the number a contract will grade. A worker
+        // that overstated would otherwise mint a proof the delegate silently
+        // grades lower — the UI would promise 25 bits and the entry would land
+        // in a lower tier with no error anywhere.
+        const bits = powBits(challenge, msg.nonce);
+        if (bits > (best?.bits ?? -1)) best = { nonce: msg.nonce, bits };
+      }
       const elapsed = (performance.now() - started) / 1000;
       opts.onProgress?.({
         best,
