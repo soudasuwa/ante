@@ -54,16 +54,17 @@ jobs:
       - name: build the delegate + embed it
         run: ./scripts/sync-delegate.sh
 
-      # NOT checked here: agreement with artifact-keys.toml. That file records
-      # what the *publisher's* machine builds, and CI can never match it —
-      # cargo hashes a path dependency's absolute path into -C metadata, so
-      # ante-core at /home/runner/work/... and ante-core at ~/projects/ante
-      # produce differently-laid-out (though string-identical) WASM. No
-      # --remap-path-prefix reaches that. See DESIGN.md.
+      # Agreement with artifact-keys.toml is checked in the `reproducible` job
+      # below, which builds at a fixed path in a container. It could not be
+      # checked HERE, and that was the whole problem: cargo hashes a path
+      # dependency's absolute path into -C metadata, so ante-core at
+      # /home/runner/work/... and at ~/projects/ante produce different bytes and
+      # no --remap-path-prefix reaches it. The committed record was therefore
+      # verifiable on exactly one machine by exactly one person — which is how
+      # it came to record keys that no clean build reproduced.
       #
-      # What CI *can* prove is below: the build is deterministic, and it leaks
-      # no machine paths. The committed record stays a pre-publish check run by
-      # whoever publishes (scripts/check-keys.sh, and sync-delegate.sh warns).
+      # What this job still proves, cheaply and on every push: the build is
+      # deterministic, and it leaks no machine paths.
 
       # The delegate key is blake3(wasm), and it is the namespace every user's
       # identity is stored under: a build that is not byte-stable silently
@@ -92,6 +93,18 @@ jobs:
         with:
           name: embedded
           path: client/src/embedded.ts
+
+  # The claim ante makes is that you do not have to trust the publisher, because
+  # every address is derived from bytes you can rebuild. This job is what makes
+  # that true for someone who is not the publisher: a fixed-path container build,
+  # compared against the committed record. Proven to give identical keys from a
+  # different host directory and with --no-cache.
+  reproducible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: the published keys are reproducible from source
+        run: ./scripts/build-in-container.sh --check
 
   web:
     runs-on: ubuntu-latest
