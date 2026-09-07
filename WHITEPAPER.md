@@ -982,11 +982,10 @@ Roughly in priority order.
    similar would flatten the attacker/user gap considerably. The cost is a much
    more expensive verification, which a contract may not be able to afford —
    worth measuring before deciding.
-7. **Carry-forward migration, before 1.0.** Today a re-key strands the
-   contract's state: your identity survives (recovery code) but your published
-   level does not, because it lived in a registry instance that moved. Fine in
-   beta; not shippable at release, since "never update" is not an option and
-   neither is losing data.
+7. **Carry-forward migration — done for contracts, open for delegates.**
+   Contract state now survives a re-key (see below). The delegate does not:
+   changing it still costs every user a manual restore from their recovery
+   code, which is item 1 and the last remaining data-loss hole.
 
    The ecosystem answer is
    [`freenet-migrate`](https://github.com/freenet/freenet-migrate), which
@@ -1048,8 +1047,6 @@ Roughly in priority order.
 9. **`fdev verify-merge` in CI.** It runs today via `scripts/verify-merge.sh`
    and passes cleanly, but CI does not install `fdev`, so it is a pre-publish
    step rather than a per-commit gate.
-10. **Memory-hard puzzles** — see item 6 above; kept separate because it changes
-   the primitive rather than the packaging.
 
 ---
 
