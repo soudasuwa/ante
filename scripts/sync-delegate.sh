@@ -14,10 +14,10 @@ WASM="$REPO_ROOT/ante-delegate/target/wasm32-unknown-unknown/release/ante_delega
 # Report a re-key rather than failing: local iteration on the delegate re-keys
 # on every edit, and that is expected. CI runs the same check as a hard gate,
 # so a re-key cannot reach main without someone recording it deliberately.
-if ! "$REPO_ROOT/scripts/check-delegate-key.sh" "$WASM"; then
+if ! "$REPO_ROOT/scripts/check-keys.sh"; then
   echo
   echo "  ^^ the delegate key moved. Fine while iterating; before you publish,"
-  echo "     run  ANTE_ACCEPT_REKEY=1 ./scripts/check-delegate-key.sh  and commit"
+  echo "     run  ANTE_ACCEPT_REKEY=1 ./scripts/check-keys.sh  and commit"
   echo "     the record, and tell users to save their recovery code first."
   echo
 fi

@@ -1,0 +1,19 @@
+# Content addresses of everything whose bytes are its identity. GENERATED —
+# update only via: ANTE_ACCEPT_REKEY=1 ./scripts/check-keys.sh
+#
+# A diff here is a BREAKING CHANGE. Say so in the release notes:
+#   delegate  -> every identity is unreachable; users restore from their
+#                recovery code (AnteClient.exportIdentity / importIdentity).
+#   contract  -> all state at the old address is stranded (guestbook entries,
+#                published identity levels).
+#
+# A contract's published instance is BLAKE3(code_hash ‖ params), so a stable
+# code_hash here plus unchanged params means a stable address. The live
+# instance ids are in DEPLOYMENTS.md.
+[delegate]
+code_hash = "92372684b18ad42d7762138351eeab49344cd378c0b3f39da1a4b23603b05d94"
+key = "3631e9328860295d00526b3ee1535bce5c5f6bf8afe3aa2624aff5e36b074915"
+
+[contracts]
+ante_registry_code_hash = "77b0a2d0b92e70d9d7db5df8f64c97af9bba875d338d75d543f92f3994ec7f00"
+guestbook_code_hash = "2d04082a6df1fcd3e30809ed72ae5e52485a75fbc31b62535baee9ce5e95bcbf"

@@ -25,6 +25,12 @@
           Message
           <textarea id="text" rows="3" maxlength="500" placeholder="say hello"></textarea>
         </label>
+        <p id="start-hint" class="muted">
+          Posting costs proof of work. Your browser searches for it — one CPU
+          core, for as long as you let it run. Nothing is signed or posted until
+          you press Post, and you can stop at any time.
+        </p>
+
         <div id="grind-panel" hidden>
           <div class="grind-live">
             <strong id="grind-bits">…</strong>
@@ -32,16 +38,16 @@
             <span id="grind-elapsed" class="muted"></span>
           </div>
           <p class="muted">
-            Your browser is searching for a better proof. The longer you let it
-            run, the higher your message sits — each extra bit takes twice as
-            long as the last. Post whenever you have had enough.
+            Searching. The longer you let it run, the higher your message sits —
+            each extra bit takes twice as long as the last. When you press Post,
+            your node will ask you to sign the proof found so far.
           </p>
         </div>
 
         <div class="actions">
-          <button id="start">Sign &amp; post</button>
+          <button id="start">Start working</button>
           <button id="post" hidden disabled>Post</button>
-          <button id="cancel" class="ghost" hidden>Cancel</button>
+          <button id="cancel" class="ghost" hidden>Stop</button>
         </div>
         <p id="progress" class="progress" hidden></p>
       </section>

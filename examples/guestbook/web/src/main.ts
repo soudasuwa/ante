@@ -165,6 +165,7 @@ function setComposeState(state: "idle" | "grinding" | "posting") {
   ($("post") as HTMLButtonElement).disabled = state === "posting";
   ($("cancel") as HTMLButtonElement).disabled = state === "posting";
   $("grind-panel").hidden = state === "idle";
+  $("start-hint").hidden = state !== "idle";
   for (const id of ["name", "text"]) {
     ($(id) as HTMLInputElement).disabled = state !== "idle";
   }

@@ -738,8 +738,8 @@ Three defences, all automated:
    machine do not end up in the binary, plus a grep of the output that *fails
    the build* if any leaked. Without this, a laptop and a CI runner produce
    different keys for identical source.
-3. **A committed key record.** `ante-delegate/delegate-key.toml` holds the
-   current `code_hash` and `key`. `scripts/check-delegate-key.sh` fails when the
+3. **A committed key record.** `artifact-keys.toml` holds the
+   current `code_hash` and `key`. `scripts/check-keys.sh` fails when the
    build disagrees, and CI runs it. A re-key is then a **reviewable diff**
    someone had to opt into with `ANTE_ACCEPT_REKEY=1`, not a surprise.
 

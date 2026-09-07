@@ -64,8 +64,8 @@ The guestbook example additionally hardcodes its contract id in
 
 Not published — delegates never propagate. Each app ships the bytes and
 registers them on the user's node (see WHITEPAPER.md §11). The current key is
-recorded in [`ante-delegate/delegate-key.toml`](ante-delegate/delegate-key.toml)
-and guarded by `./scripts/check-delegate-key.sh`.
+recorded in [`artifact-keys.toml`](artifact-keys.toml)
+and guarded by `./scripts/check-keys.sh`.
 
 **When this key changes, every stored identity becomes unreachable** and each
 user must restore from their recovery code. Say so in the release notes, and

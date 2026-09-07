@@ -38,7 +38,7 @@ client/         @ante/client — the delegate embedded + a 2-line API an app cal
 web/            identity-management UI: create an identity, grind bits, back it up
 tools/          delegate-key: compute a delegate's address from its WASM
 scripts/        build-delegate.sh, sync-delegate.sh, build-contract.sh,
-                check-delegate-key.sh (guards against an accidental re-key)
+                check-keys.sh (guards against an accidental re-key)
 examples/
   guestbook/    a standalone Freenet app showing how to integrate @ante/client
 ```

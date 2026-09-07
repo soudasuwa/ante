@@ -51,8 +51,8 @@ jobs:
       # as little as a shifted line above a panic! in ante-core to cause one
       # (`line!()` is baked into the binary). The key is a committed fact, so
       # moving it has to be a deliberate, reviewable act.
-      - name: the delegate key matches its committed record
-        run: ./scripts/check-delegate-key.sh
+      - name: artifact keys match their committed record
+        run: ./scripts/check-keys.sh
 
       # The delegate key is blake3(wasm), and it is the namespace every user's
       # identity is stored under: a build that is not byte-stable silently

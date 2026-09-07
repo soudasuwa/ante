@@ -131,19 +131,30 @@ a bug fix, a dependency bump — produces a new key and strands what was stored
 under the old one: every user's identity seed (delegate) and every published
 level (registry).
 
-**How little it takes.** `panic!` and `expect` bake `line!()` into the binary,
-so *adding a comment line* in `ante-core` above one of them shifts the constant
-and changes the delegate's bytes. Measured, not theorised: one comment line at
-the top of `ante-core/src/lib.rs` moves the key, because `to_cbor`'s
-`expect("CBOR serialization cannot fail")` sits below it and the delegate calls
-`to_cbor` on every reply. Treat `ante-core` and `ante-delegate` as frozen
-between deliberate releases; batch edits rather than trickling them.
+**How little it takes — and where it does not.** `panic!` and `expect` bake
+`line!()` into the binary, so a shifted line above one changes the bytes.
+Measured, not theorised:
+
+| edit | delegate | contracts |
+|---|---|---|
+| one comment line in `ante-core/src/lib.rs` | **re-keys** | unchanged |
+| one comment line in `proof.rs` / `pow.rs` / `registry.rs` | — | unchanged |
+
+The delegate moves because it calls `ante_core::to_cbor`, whose
+`expect("CBOR serialization cannot fail")` sits near the top of `lib.rs`, on
+every reply. The contracts survive the same edits because they set
+`panic = "abort"` with `strip = true` and carry their own `cbor()` helper rather
+than linking that one. That asymmetry is a property to *verify*, not assume —
+which is what the guard below is for. Treat `ante-core` and `ante-delegate` as
+frozen between deliberate releases; batch edits rather than trickling them.
 
 Two guards make that concrete, both run in CI:
 
-- `scripts/check-delegate-key.sh` compares the built key against the committed
-  `ante-delegate/delegate-key.toml`. A re-key fails the build until someone
-  records it with `ANTE_ACCEPT_REKEY=1`, which turns it into a reviewable diff.
+- `scripts/check-keys.sh` compares the delegate key **and both contract code
+  hashes** against the committed `artifact-keys.toml`. A re-key fails the build
+  until someone records it with `ANTE_ACCEPT_REKEY=1`, which turns it into a
+  reviewable diff. Contracts are covered because a moved contract address
+  strands all its state — every guestbook entry, every published level.
 - The same job builds the delegate twice from clean and compares hashes, so a
   build that is not byte-stable is caught here rather than in production. (This
   is why `wasm-opt` is *not* run: it is deterministic only for a fixed version,
