@@ -155,12 +155,17 @@ async function findPrevious() {
     const search = await ante.findStrandedIdentities(deployments.delegate.superseded);
 
     if (search.found.length === 0) {
+      // Two different answers, and the difference matters to what the user
+      // should do next. If every earlier version answered, "nothing here" is a
+      // fact and they can stop looking. If one stayed silent, we genuinely
+      // cannot tell a version this node never installed from a broken one —
+      // both are silence — so the honest thing is to name the likely case and
+      // point at the reliable way back rather than leave them guessing.
+      const n = search.unresponsive.length;
       status.textContent =
-        search.unresponsive.length > 0
-          ? // Not "nothing found": a version this node never had looks exactly
-            // like one that is broken, and neither proves an absence.
-            `no earlier identity found — ${search.unresponsive.length} version${search.unresponsive.length === 1 ? "" : "s"} did not answer, which may just mean this node never had ${search.unresponsive.length === 1 ? "it" : "them"}`
-          : "no earlier identity on this node";
+        n > 0
+          ? `Nothing to recover. ${n === 1 ? "An earlier version" : `${n} earlier versions`} of ante ${n === 1 ? "gave" : "gave"} no answer, which usually means ante was never used on this node before. If you know it was, your recovery code is the reliable way back.`
+          : "Nothing to recover — the earlier versions answered, and none holds a different identity.";
       return;
     }
 
