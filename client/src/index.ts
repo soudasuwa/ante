@@ -27,7 +27,12 @@ export {
   identityFingerprintFromCode,
 } from "./recovery";
 export { RegistryClient, registryConfigured, ANTE_REGISTRY_CONTRACT_ID } from "./registry";
-export { migrateRegistry, type MigrationReport } from "./migrate";
+export {
+  probeGenerations,
+  migrateRegistry,
+  type GenerationProbe,
+  type MigrationReport,
+} from "./migrate";
 
 export {
   type AnteProof,

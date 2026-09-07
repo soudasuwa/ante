@@ -90,6 +90,24 @@ export function decodeEntry(value: CborValue | undefined): Entry {
   };
 }
 
+/// Entries held in a raw state blob — used to read a *predecessor* generation
+/// during carry-forward. Whether each is still valid is an ante question, so it
+/// lives in ante.ts, not here.
+export function entriesInState(stateBytes: Uint8Array): Entry[] {
+  if (stateBytes.length === 0) return [];
+  const map = mapGet(cborDecode(stateBytes), "entries");
+  if (!(map instanceof Map)) return [];
+  const out: Entry[] = [];
+  for (const value of map.values()) {
+    try {
+      out.push(decodeEntry(value));
+    } catch {
+      // a corrupt entry is skipped, never carried
+    }
+  }
+  return out;
+}
+
 export class Guestbook {
   private readonly key = contractKeyFromId(contractId());
 
@@ -105,6 +123,12 @@ export class Guestbook {
     const map = mapGet(cborDecode(bytes), "entries");
     if (!(map instanceof Map)) return [];
     return [...map.values()].map(decodeEntry);
+  }
+
+  /// Append many entries in one delta — the carry-forward path.
+  async postMany(entries: Entry[]): Promise<void> {
+    const delta = cborEncode({ entries: entries.map(encodeEntry) });
+    await this.fn.updateContractDelta(this.key, delta);
   }
 
   /// Append one entry with a delta UPDATE (`GuestbookDelta { entries }`). The

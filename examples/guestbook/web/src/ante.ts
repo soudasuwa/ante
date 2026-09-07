@@ -45,6 +45,22 @@ export function startPostGrind(
   });
 }
 
+/// Split a predecessor generation's entries into those still valid under the
+/// CURRENT rules and a count of those that are not.
+///
+/// The drops are not corruption. Entries written before proofs were bound to
+/// the message they pay for carry a bare purpose, and the contract now demands
+/// a content-bound one — so a security fix legitimately strands the data it was
+/// protecting against. Carrying them would reopen "one grind buys unlimited
+/// posts".
+export function carryableEntries(entries: { name: string; text: string; proof: AnteProof }[]): {
+  carryable: typeof entries;
+  dropped: number;
+} {
+  const carryable = entries.filter((e) => checkProof(e) !== null);
+  return { carryable, dropped: entries.length - carryable.length };
+}
+
 /// Re-verify a displayed entry's proof. Returns the bits it demonstrates, or
 /// null if it does not clear the guestbook's bar / the signature is bad.
 export function checkProof(entry: { name: string; text: string; proof: AnteProof }): number | null {

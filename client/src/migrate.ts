@@ -34,6 +34,28 @@ import { decodeAnteProofValue } from "./ante-proof";
 /// sweep would hang rather than report a gap.
 const PROBE_TIMEOUT_MS = 12_000;
 
+/// What an app must supply to carry its own state forward. The probe owns the
+/// decisions (order, hit criteria, when to stop, what counts as an answer);
+/// this is the part only the app can know.
+export interface GenerationProbe<T> {
+  /// Items in a predecessor's state that are still valid under the CURRENT
+  /// rules, plus a count of those that are not.
+  ///
+  /// Dropping happens here, deliberately, rather than being left to the
+  /// contract: a delta is rejected as a whole if any single item in it is
+  /// inadmissible, so one stale item would block every good one travelling
+  /// with it. It is also the honest place for it — a rule that tightened (a
+  /// security fix, say) legitimately strands what it was protecting against,
+  /// and that is a drop, not an absence.
+  decode(stateBytes: Uint8Array): { carryable: T[]; dropped: number };
+  /// Submit one batch through the app's normal write path, so the contract's
+  /// own validator sees every item.
+  submit(items: T[]): Promise<void>;
+  /// Items per delta. State that grows without bound needs this; the default
+  /// suits collections that do not.
+  chunkSize?: number;
+}
+
 export interface MigrationReport {
   /// Predecessor ids that answered with state.
   hits: string[];
@@ -41,8 +63,10 @@ export interface MigrationReport {
   empty: string[];
   /// Never answered — timed out or errored. NOT evidence of absence.
   unresolved: string[];
-  /// Proofs carried into the current generation.
+  /// Items carried into the current generation.
   carried: number;
+  /// Items found but not carried: no longer valid under the current rules.
+  dropped: number;
   /// True only when every predecessor answered. While false the sweep should
   /// be run again on a later load: something may still be out there.
   complete: boolean;
@@ -64,61 +88,34 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   });
 }
 
-/// Every proof a registry state holds, ignoring any that no longer verify.
-function proofsIn(stateBytes: Uint8Array, minBits: number): AnteProof[] {
-  if (stateBytes.length === 0) return [];
-  const levels = mapGet(cborDecode(stateBytes), "levels");
-  if (!(levels instanceof Map)) return [];
-
-  const out: AnteProof[] = [];
-  for (const [key, value] of levels) {
-    let proof: AnteProof;
-    try {
-      proof = decodeAnteProofValue(value);
-    } catch {
-      continue; // a corrupt entry is skipped, never carried
-    }
-    // Filed under its own key, and still clearing the floor the CURRENT
-    // generation enforces — the contract rejects a whole delta if any proof in
-    // it is inadmissible, so an unusable proof must not travel with the rest.
-    try {
-      if (!bytesMatch(asBytes(key), proof.identityVk)) continue;
-    } catch {
-      continue;
-    }
-    if (verifyAnteProof(proof, minBits).ok) out.push(proof);
-  }
-  return out;
-}
-
 function bytesMatch(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 
-/// Probe every predecessor and carry what they hold into the current registry.
+/// Probe every predecessor and carry what they hold into the current generation.
 ///
-/// Sweeps all generations rather than stopping at the newest that answers: the
-/// registry is a monotonic union, so more proofs is strictly better and cannot
-/// undo anything. (That is `freenet-migrate`'s `FoldAll`. Its warning about
-/// resurrecting delete-by-absence data does not apply here — nothing is ever
-/// deleted from this state.)
-export async function migrateRegistry(
+/// Sweeps all generations rather than stopping at the newest that answers. That
+/// is `freenet-migrate`'s `FoldAll`, and its warning about resurrecting
+/// delete-by-absence data applies only to state that deletes; ante's
+/// collections are grow-only, so more is strictly better and cannot undo
+/// anything.
+export async function probeGenerations<T>(
   client: FreenetClient,
   current: string,
   predecessors: readonly string[],
-  minBits: number,
-  submit: (proofs: AnteProof[]) => Promise<void>,
+  probe: GenerationProbe<T>,
 ): Promise<MigrationReport> {
   const report: MigrationReport = {
     hits: [],
     empty: [],
     unresolved: [],
     carried: 0,
+    dropped: 0,
     complete: true,
   };
-  const collected: AnteProof[] = [];
+  const collected: T[] = [];
 
   for (const id of predecessors) {
     if (id === current) continue;
@@ -137,19 +134,64 @@ export async function migrateRegistry(
       continue;
     }
 
-    const proofs = proofsIn(bytes, minBits);
-    if (proofs.length === 0) report.empty.push(id);
+    let carryable: T[] = [];
+    let dropped = 0;
+    try {
+      ({ carryable, dropped } = probe.decode(bytes));
+    } catch {
+      // Undecodable state is an answer: this generation holds nothing usable.
+    }
+    report.dropped += dropped;
+    if (carryable.length === 0) report.empty.push(id);
     else {
       report.hits.push(id);
-      collected.push(...proofs);
+      collected.push(...carryable);
     }
   }
 
-  if (collected.length > 0) {
-    // One delta. Duplicates and already-known proofs are harmless: `admit` keeps
-    // the better of the two and reports the rest as no-ops.
-    await submit(collected);
-    report.carried = collected.length;
+  // Duplicates and already-known items are harmless — every one of ante's
+  // collections is a monotonic union, so re-submitting is a no-op.
+  const chunk = probe.chunkSize ?? 64;
+  for (let i = 0; i < collected.length; i += chunk) {
+    await probe.submit(collected.slice(i, i + chunk));
   }
+  report.carried = collected.length;
   return report;
+}
+
+/// The registry's carry-forward: identity levels.
+export async function migrateRegistry(
+  client: FreenetClient,
+  current: string,
+  predecessors: readonly string[],
+  minBits: number,
+  submit: (proofs: AnteProof[]) => Promise<void>,
+): Promise<MigrationReport> {
+  return probeGenerations<AnteProof>(client, current, predecessors, {
+    decode: (bytes) => {
+      const all = allProofsIn(bytes);
+      const carryable = all.filter((p) => verifyAnteProof(p, minBits).ok);
+      return { carryable, dropped: all.length - carryable.length };
+    },
+    submit,
+  });
+}
+
+/// Every proof a registry state holds, filed under its own key. Validity
+/// against the current floor is the caller's business.
+function allProofsIn(stateBytes: Uint8Array): AnteProof[] {
+  if (stateBytes.length === 0) return [];
+  const levels = mapGet(cborDecode(stateBytes), "levels");
+  if (!(levels instanceof Map)) return [];
+
+  const out: AnteProof[] = [];
+  for (const [key, value] of levels) {
+    try {
+      const proof = decodeAnteProofValue(value);
+      if (bytesMatch(asBytes(key), proof.identityVk)) out.push(proof);
+    } catch {
+      // a corrupt entry is skipped, never carried
+    }
+  }
+  return out;
 }

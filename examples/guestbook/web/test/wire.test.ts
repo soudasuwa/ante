@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { bytesToHex, cborDecode, cborEncode, hexToBytes, mapGet } from "@ante/client";
 
-import { contentPurpose, decodeEntry, encodeEntry } from "../src/guestbook";
+import { contentPurpose, decodeEntry, encodeEntry, entriesInState } from "../src/guestbook";
+import { carryableEntries } from "../src/ante";
 
 // The exact bytes `ante-guestbook-contract`'s `delta_cbor_wire_format_is_pinned`
 // pins on the Rust side. This test proves the web client's decode → encode
@@ -50,5 +51,43 @@ describe("content binding", () => {
 
   it("stays inside the purpose length cap", () => {
     expect(contentPurpose("x".repeat(40), "y".repeat(500)).length).toBeLessThanOrEqual(256);
+  });
+});
+
+describe("carry-forward across a re-key", () => {
+  const delta = cborDecode(hexToBytes(PINNED_DELTA_HEX));
+  const list = mapGet(delta, "entries") as unknown[];
+  const good = decodeEntry(list[0] as never);
+
+  it("reads entries out of a predecessor's raw state", () => {
+    const levels = new Map<unknown, unknown>();
+    levels.set(Array.from(good.proof.identityVk), encodeEntry(good));
+    const state = cborEncode({ entries: levels } as never);
+    expect(entriesInState(state).map((e) => e.text)).toEqual([good.text]);
+  });
+
+  it("returns nothing for an empty or undecodable state", () => {
+    expect(entriesInState(new Uint8Array())).toEqual([]);
+    expect(entriesInState(cborEncode({ nope: 1 }))).toEqual([]);
+  });
+
+  it("drops entries whose proof is not bound to their message", () => {
+    // What every entry looked like before the content-binding fix: a bare
+    // purpose, valid then, inadmissible now. Carrying it would reopen "one
+    // grind buys unlimited posts", so the sweep must drop it — and must not
+    // report the generation as merely empty.
+    const legacy = {
+      ...good,
+      proof: { ...good.proof, purpose: "ante-guestbook:post:v1" },
+    };
+    const { carryable, dropped } = carryableEntries([good, legacy]);
+    expect(carryable).toHaveLength(1);
+    expect(carryable[0].text).toBe(good.text);
+    expect(dropped).toBe(1);
+  });
+
+  it("drops an entry whose text was altered after signing", () => {
+    const tampered = { ...good, text: good.text + "!" };
+    expect(carryableEntries([tampered]).dropped).toBe(1);
   });
 });

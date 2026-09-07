@@ -1016,7 +1016,20 @@ Roughly in priority order.
    ever deleted from this state. Recovered proofs go in through the ordinary
    delta path, so `admit` re-validates each one and the sweep is permissionless.
 
-   Still open: the guestbook's entries want the identical treatment.
+   **And for the guestbook**, through the same generic driver
+   (`probeGenerations`), which is what `@ante/client` now offers any consuming
+   app: supply *decode* and *submit*, the probe owns the decisions.
+
+   The guestbook exposed the rule that a migration is not a restore. Its oldest
+   generation predates the content-binding fix (§4.5), so its entries carry a
+   bare purpose the current contract refuses — **a security fix legitimately
+   strands the data it was protecting against**, and carrying those entries
+   would reopen "one grind buys unlimited posts". So carry-forward moves what is
+   still valid *under today's rules*, not everything that ever existed, and it
+   reports those as dropped rather than as an empty generation. Filtering
+   happens client-side because a delta is rejected as a whole if any single item
+   in it is inadmissible: one stale entry would block every good one travelling
+   with it.
 
    The half that cannot wait, and is done: the **lineage**. Every superseded
    generation is recorded automatically — code hashes into `artifact-keys.toml`

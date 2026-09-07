@@ -8,9 +8,12 @@ import { FreenetClient, fingerprint } from "@ante/client";
 
 import deployments from "../../../../deployments.json";
 
-import { attachAnte, checkProof, startPostGrind, type GrindSession } from "./ante";
+import { attachAnte, carryableEntries, checkProof, startPostGrind, type GrindSession } from "./ante";
+import { probeGenerations } from "@ante/client";
+
 import {
   contractId,
+  entriesInState,
   Guestbook,
   GUESTBOOK_MIN_BITS,
   MAX_NAME_BYTES,
@@ -56,6 +59,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const ANTE_APP = deployments.sites.vault.contract;
 
 let gb: Guestbook | null = null;
+let gbClient: import("@ante/client").FreenetClient | null = null;
 let ante: Awaited<ReturnType<typeof attachAnte>> | null = null;
 /// The in-flight grind, if the compose form is currently working.
 let session: GrindSession | null = null;
@@ -87,13 +91,50 @@ async function boot() {
       onClose: (c, r) => status(`connection closed: ${r || c}`, "err"),
     });
     gb = new Guestbook(fn);
+    gbClient = fn;
     status("connected — registering the ante delegate…");
     ante = await attachAnte(fn);
     $("compose").hidden = false;
     status("ready", "ok");
     await refresh();
+    void sweepPredecessors();
   } catch (err) {
     status(`could not start: ${(err as Error).message}`, "err");
+  }
+}
+
+/// Bring entries forward from generations stranded by a contract re-key.
+///
+/// Runs on every load, not once: a predecessor that never answered is recorded
+/// unresolved rather than empty, so the sweep must be repeatable. The ante
+/// pieces are `entriesInState` -> `carryableEntries` (what is still valid) and
+/// `postMany` (the ordinary write path, so the contract re-checks every entry).
+async function sweepPredecessors() {
+  const previous = deployments.contracts.guestbook.superseded;
+  if (!gb || previous.length === 0) return;
+
+  const note = $("sweep-status");
+  note.hidden = false;
+  note.textContent = `checking ${previous.length} earlier guestbook${previous.length === 1 ? "" : "s"} for posts…`;
+  try {
+    const r = await probeGenerations(gbClient!, deployments.contracts.guestbook.instance, previous, {
+      decode: (bytes) => carryableEntries(entriesInState(bytes)),
+      submit: (entries) => gb!.postMany(entries),
+      chunkSize: 32,
+    });
+
+    const parts: string[] = [];
+    if (r.carried > 0) parts.push(`recovered ${r.carried} post${r.carried === 1 ? "" : "s"}`);
+    if (r.dropped > 0) parts.push(`${r.dropped} too old to carry`);
+    if (!r.complete) parts.push(`${r.unresolved.length} did not answer — will retry`);
+
+    if (parts.length === 0) note.hidden = true;
+    else {
+      note.textContent = parts.join(" · ");
+      if (r.carried > 0) await refresh();
+    }
+  } catch {
+    note.hidden = true; // a background sweep must never break the page
   }
 }
 
