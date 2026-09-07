@@ -9,3 +9,8 @@ dist
 /client/src/embedded.ts
 /site/whitepaper.html
 .artifact-build-stamp
+
+# Extracted container build artifacts — reproducible from build/Dockerfile,
+# so committing them adds ~800KB of binaries that can silently disagree with
+# the source they claim to come from.
+build/out/
