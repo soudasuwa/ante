@@ -54,12 +54,16 @@ jobs:
       - name: build the delegate + embed it
         run: ./scripts/sync-delegate.sh
 
-      # A re-key strands every identity stored under the old key, and it takes
-      # as little as a shifted line above a panic! in ante-core to cause one
-      # (`line!()` is baked into the binary). The key is a committed fact, so
-      # moving it has to be a deliberate, reviewable act.
-      - name: artifact keys match their committed record
-        run: ./scripts/check-keys.sh
+      # NOT checked here: agreement with artifact-keys.toml. That file records
+      # what the *publisher's* machine builds, and CI can never match it —
+      # cargo hashes a path dependency's absolute path into -C metadata, so
+      # ante-core at /home/runner/work/... and ante-core at ~/projects/ante
+      # produce differently-laid-out (though string-identical) WASM. No
+      # --remap-path-prefix reaches that. See DESIGN.md.
+      #
+      # What CI *can* prove is below: the build is deterministic, and it leaks
+      # no machine paths. The committed record stays a pre-publish check run by
+      # whoever publishes (scripts/check-keys.sh, and sync-delegate.sh warns).
 
       # The delegate key is blake3(wasm), and it is the namespace every user's
       # identity is stored under: a build that is not byte-stable silently

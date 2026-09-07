@@ -16,8 +16,17 @@
 # `panic = "abort"` + `strip` and carry their own `cbor()` helper. That is a
 # property to verify, not to assume.
 #
-#   ./scripts/check-keys.sh                         # verify (CI does this)
-#   ANTE_ACCEPT_REKEY=1 ./scripts/check-keys.sh     # record a deliberate one
+# SCOPE: this is machine-relative, and deliberately so. Cargo hashes a path
+# dependency's absolute path into -C metadata, so the same commit built at two
+# different directories yields different (string-identical, differently
+# laid-out) WASM. Measured: two copies of one tree at different paths differ.
+# So artifact-keys.toml records what YOUR checkout produces, and the question
+# it answers is "did my key move since I last looked" — which is exactly the
+# failure worth catching. CI cannot run it; CI proves determinism and the
+# absence of leaked paths instead.
+#
+#   ./scripts/check-keys.sh                         # verify before publishing
+#   ANTE_ACCEPT_REKEY=1 ./scripts/check-keys.sh     # record a deliberate re-key
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

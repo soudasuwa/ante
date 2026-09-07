@@ -172,6 +172,23 @@ needed for that, and both were missing until CI disagreed with a laptop:
   `ante-core/src/lib.rs` — an absolute path — into rodata. `build-delegate.sh`
   also only *checked* for `$CARGO_HOME`, which is why the leak survived.
 
+**What "reproducible" does and does not mean here.** Measured: two copies of the
+same commit, at two different directories, same rustc, same flags, produce WASM
+of identical size with identical strings and *different bytes*. Cargo hashes a
+path dependency's absolute path into `-C metadata`, which drives symbol mangling
+and rodata layout; `ante-core` sits beside each artifact rather than inside it,
+so its location moves the output. No `--remap-path-prefix` reaches that — the
+flags are not what carries the path, the package identity is.
+
+So the honest claim is **same-path reproducibility**: one checkout rebuilds
+byte-identically, forever, which is what catches an accidental re-key. It is
+*not* "anyone can rebuild and confirm the published bytes". Making that true
+needs the build to happen at a fixed absolute path — a container with a fixed
+`WORKDIR` — which is the standard fix and is not yet done here. Until it is, the
+published artifact is whatever the publisher's machine produced, and
+`artifact-keys.toml` records that machine's answer.
+
+
 The committed per-crate `Cargo.lock` prevents *accidental* re-keys. For the
 delegate, `ExportIdentity` / `ImportIdentity` already give the user a manual
 path across a re-key: save the recovery code before upgrading, restore it

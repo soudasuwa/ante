@@ -729,6 +729,19 @@ an optional one.
 
 ### 12.2 What we do about it
 
+**A limit worth stating plainly.** "Reproducible" here means *same-path*
+reproducible. Two copies of one commit, at two directories, with the same rustc
+and the same flags, produce WASM of identical size and identical strings but
+different bytes — cargo hashes a path dependency's absolute path into
+`-C metadata`, which reorders symbols and rodata, and `ante-core` sits beside
+each artifact rather than inside it. No `--remap-path-prefix` reaches it,
+because the flags are not what carries the path; the package identity is.
+
+That is enough to catch an accidental re-key, which is the failure that hurts.
+It is not enough for a third party to rebuild and confirm the published bytes.
+Getting there requires building at a fixed absolute path — a container with a
+fixed `WORKDIR` — and is listed in §16.
+
 Three defences, all automated:
 
 1. **Committed per-crate `Cargo.lock`** for the delegate and each contract, so a
@@ -957,12 +970,15 @@ Roughly in priority order.
    similar would flatten the attacker/user gap considerably. The cost is a much
    more expensive verification, which a contract may not be able to afford —
    worth measuring before deciding.
-7. **`fdev verify-merge` in CI** against real state corpora, complementing the
+7. **A fixed-path (containerised) build**, so a third party can rebuild the
+   delegate and confirm the published key. Today the build is only same-path
+   reproducible (§12.1), which catches accidental re-keys but does not let
+   anyone verify the shipped bytes independently. A `Dockerfile` with a fixed
+   `WORKDIR` is the whole fix.
+8. **`fdev verify-merge` in CI** against real state corpora, complementing the
    in-crate merge-law tests.
-8. **Feature-gate `ante_core::testvec`** so it is not public API. Trivial, but
-   it re-keys the delegate for zero measured bytes, so it waits for the next
-   deliberate re-key. This is the pattern for every piece of cosmetic
-   maintenance in this codebase.
+9. **Memory-hard puzzles** — see item 6 above; kept separate because it changes
+   the primitive rather than the packaging.
 
 ---
 
