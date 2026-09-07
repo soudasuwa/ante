@@ -54,4 +54,12 @@ export {
   asNumber,
   asString,
 } from "./cbor";
-export { bytesToHex, hexToBytes, bytesEqual, base58, base58decode } from "./util";
+export {
+  bytesToHex,
+  hexToBytes,
+  bytesEqual,
+  base58,
+  base58decode,
+  concatBytes,
+  u32le,
+} from "./util";

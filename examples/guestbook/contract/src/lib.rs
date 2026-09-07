@@ -52,10 +52,36 @@ pub struct Entry {
     pub proof: AnteProof,
 }
 
+/// The `purpose` a proof must carry to count for this exact message.
+///
+/// This is the whole defence against one grind buying unlimited posts. An
+/// [`AnteProof`] commits to `(identity, purpose, nonce)` and **nothing else**,
+/// so with a fixed purpose the same nonce validates any text you like — and
+/// because the challenge is `blake3(purpose ‖ vk)` and grinding starts at nonce
+/// 0, an author replays the identical search every time and re-finds the same
+/// lucky nonce for free. Folding the message into the purpose gives every
+/// distinct post its own challenge, and therefore its own genuine search.
+///
+/// Both lengths are prefixed so `(name, text)` cannot be re-split: without it
+/// `("ab", "c")` and `("a", "bc")` would hash alike.
+pub fn content_purpose(prefix: &str, name: &str, text: &str) -> String {
+    let mut h = blake3::Hasher::new();
+    h.update(&(name.len() as u32).to_le_bytes());
+    h.update(name.as_bytes());
+    h.update(&(text.len() as u32).to_le_bytes());
+    h.update(text.as_bytes());
+    let tag = h.finalize();
+    let mut out = String::with_capacity(prefix.len() + 17);
+    out.push_str(prefix);
+    out.push(':');
+    for byte in &tag.as_bytes()[..8] {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
+}
+
 impl Entry {
-    /// Stable key: dedupes an entry replayed verbatim, and binds the text to
-    /// the proof (change the text and the key changes, so the old proof no
-    /// longer covers it).
+    /// Stable key: dedupes an entry replayed verbatim.
     pub fn key(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
         h.update(&self.proof.identity_vk);
@@ -71,13 +97,14 @@ impl Entry {
         if self.text.is_empty() || self.text.len() > MAX_TEXT_BYTES {
             return Err("text out of bounds".into());
         }
-        if self.proof.purpose != params.purpose {
-            return Err("proof is for a different purpose".into());
+        // The proof must be bound to THIS message, not merely to the
+        // guestbook. See `content_purpose`.
+        if self.proof.purpose != content_purpose(&params.purpose, &self.name, &self.text) {
+            return Err("proof is not bound to this message".into());
         }
-        // verify() also recomputes the achieved bits from the nonce, so the
-        // author cannot overstate them, and checks the signature over
-        // (vk, purpose, nonce, ts) — which is what binds the proof to this
-        // exact author and text-key.
+        // verify() recomputes the achieved bits from the nonce, so the author
+        // cannot overstate them, and checks the signature over
+        // (vk, purpose, nonce, ts) — binding the proof to this exact author.
         self.proof
             .verify(params.min_bits)
             .map(|_bits| ())

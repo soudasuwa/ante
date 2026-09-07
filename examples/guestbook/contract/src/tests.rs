@@ -24,14 +24,16 @@ fn author(seed: u8) -> SigningKey {
     SigningKey::from_bytes(&[seed; 32])
 }
 
-/// An entry whose proof clears `bits` for `purpose`.
-fn entry(key: &SigningKey, name: &str, text: &str, purpose: &str, bits: u32) -> Entry {
+/// An entry whose proof clears `bits`, bound to its own content under
+/// `prefix`. Pass a different `prefix` to simulate a proof minted elsewhere.
+fn entry(key: &SigningKey, name: &str, text: &str, prefix: &str, bits: u32) -> Entry {
     let vk = key.verifying_key().to_bytes();
-    let nonce = pow::grind(purpose, &vk, bits).expect("reachable");
+    let purpose = crate::content_purpose(prefix, name, text);
+    let nonce = pow::grind(&purpose, &vk, bits).expect("reachable");
     Entry {
         name: name.into(),
         text: text.into(),
-        proof: AnteProof::create(key, purpose.into(), nonce, 1_700_000_000_000),
+        proof: AnteProof::create(key, purpose, nonce, 1_700_000_000_000),
     }
 }
 
@@ -189,22 +191,18 @@ fn the_pinned_delta_is_accepted_by_update_state() {
     assert_eq!(decoded.entries.len(), 1);
 }
 
-const PINNED_DELTA_HEX: &str = "a167656e747269657381a3646e616d6565616c69636564746578746568656c6c6f6570726f6f66a56b6964656e746974795f766b982018ea184a186c186318e2189c18520a18be18f51850187b13182e18c518f918951847187618ae18be18be187b18921842181e18ea186914184618d2182c67707572706f736576616e74652d6775657374626f6f6b3a706f73743a7631656e6f6e6365192c396274731b00000191dd9dec00697369676e61747572659840184c1832182e1887185a1861187218b318a3189218a0181c18eb1869182e18ec18821863184718350418221718e5186f1839189c187618571822185d189618ec18561318fc183d184c18a4183d18d018ac18df18f418791866183418fc18d118e918e118c7186c1842184518211851186502182a1401186102";
+const PINNED_DELTA_HEX: &str = "a167656e747269657381a3646e616d6565616c69636564746578746568656c6c6f6570726f6f66a56b6964656e746974795f766b982018ea184a186c186318e2189c18520a18be18f51850187b13182e18c518f918951847187618ae18be18be187b18921842181e18ea186914184618d2182c67707572706f73657827616e74652d6775657374626f6f6b3a706f73743a76313a34333731306633666431373037343835656e6f6e63651970516274731b00000191dd9dec00697369676e617475726598401876188318e218b71887183918da182918a11848188a18c5183f18fe183b1852188b185e1854186f1873187218a51883183c0018ce1867189218410d18db18ed18bc186a031821187318c2182318b518c20718f3188518a818f9189d188a0b18c1184a18ca185a188c18c618a618b91840189318a918a718ef06";
 
 fn pinned_delta() -> GuestbookDelta {
     let key = SigningKey::from_bytes(&[7u8; 32]);
     let vk = key.verifying_key().to_bytes();
-    let nonce = pow::grind("ante-guestbook:post:v1", &vk, 16).expect("reachable");
+    let purpose = crate::content_purpose("ante-guestbook:post:v1", "alice", "hello");
+    let nonce = pow::grind(&purpose, &vk, 16).expect("reachable");
     GuestbookDelta {
         entries: vec![Entry {
             name: "alice".into(),
             text: "hello".into(),
-            proof: AnteProof::create(
-                &key,
-                "ante-guestbook:post:v1".into(),
-                nonce,
-                1_726_000_000_000,
-            ),
+            proof: AnteProof::create(&key, purpose, nonce, 1_726_000_000_000),
         }],
     }
 }
@@ -225,4 +223,66 @@ fn get_state_delta_returns_only_entries_the_peer_lacks() {
     let delta: GuestbookDelta = from_cbor(&delta).unwrap();
     assert_eq!(delta.entries.len(), 1, "only the entry s1 was missing");
     assert_eq!(delta.entries[0].name, "b");
+}
+
+/// The reason `content_purpose` exists. Before it, an `AnteProof` committed to
+/// (identity, purpose, nonce) and nothing else — so one grind, however
+/// expensive, validated an unlimited number of *different* messages. Worse, the
+/// challenge is fixed per (purpose, identity) and grinding starts at nonce 0,
+/// so an author re-found the same nonce for free on every post. That is not
+/// per-post proof of work; it is a one-time toll.
+#[test]
+fn a_proof_cannot_be_moved_to_a_different_message() {
+    let author = author(30);
+    let original = entry(
+        &author,
+        "mallory",
+        "the message I paid for",
+        PURPOSE,
+        MIN_BITS,
+    );
+    assert!(
+        apply(&[], vec![original.clone()]).is_ok(),
+        "the real post is fine"
+    );
+
+    // Same author, same (expensive) proof, different text.
+    let reused = Entry {
+        name: original.name.clone(),
+        text: "a completely different message, for free".into(),
+        proof: original.proof.clone(),
+    };
+    assert!(
+        apply(&[], vec![reused]).is_err(),
+        "a proof must not carry over to another message"
+    );
+
+    // And the name is bound too, not just the body.
+    let renamed = Entry {
+        name: "someone else".into(),
+        text: original.text.clone(),
+        proof: original.proof,
+    };
+    assert!(
+        apply(&[], vec![renamed]).is_err(),
+        "the name is bound as well"
+    );
+}
+
+/// Each distinct message gets its own challenge, so each needs its own search.
+#[test]
+fn different_messages_get_different_purposes() {
+    let a = crate::content_purpose(PURPOSE, "alice", "hello");
+    let b = crate::content_purpose(PURPOSE, "alice", "hello!");
+    let c = crate::content_purpose(PURPOSE, "alicia", "hello");
+    assert_ne!(a, b);
+    assert_ne!(a, c);
+    assert!(a.starts_with(PURPOSE), "the app prefix stays readable: {a}");
+    assert!(a.len() <= ante_core::pow::MAX_PURPOSE_BYTES);
+
+    // Length-prefixing: ("ab","c") and ("a","bc") must not collide.
+    assert_ne!(
+        crate::content_purpose(PURPOSE, "ab", "c"),
+        crate::content_purpose(PURPOSE, "a", "bc")
+    );
 }

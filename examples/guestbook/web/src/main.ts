@@ -45,6 +45,10 @@ let gb: Guestbook | null = null;
 let ante: Awaited<ReturnType<typeof attachAnte>> | null = null;
 /// The in-flight grind, if the compose form is currently working.
 let session: GrindSession | null = null;
+/// Bumped whenever a grind is started or abandoned. A worker whose generation
+/// no longer matches is stale: it must not paint the readout, and if it arrives
+/// after a cancel it must be terminated rather than left running forever.
+let generation = 0;
 
 function status(text: string, kind: "" | "ok" | "err" = "") {
   const el = $("status");
@@ -90,7 +94,7 @@ async function refresh() {
   // Re-verify every proof client-side; drop anything that does not check out.
   const shown: Shown[] = [];
   for (const entry of entries) {
-    const bits = checkProof(entry.proof);
+    const bits = checkProof(entry);
     if (bits !== null) shown.push({ entry, bits });
   }
 
@@ -206,13 +210,22 @@ function composeInput(): { name: string; text: string } | null {
 }
 
 async function startGrinding() {
-  if (!ante || session || !composeInput()) return;
+  const input = composeInput();
+  if (!ante || session || !input) return;
+
+  const gen = ++generation;
   setComposeState("grinding");
-  renderGrind(null, 0);
+  renderGrind(null, 0, 0);
   try {
-    session = await startPostGrind(ante, (p) =>
-      renderGrind(p.best?.bits ?? null, p.elapsed, p.tried),
-    );
+    const started = await startPostGrind(ante, input.name, input.text, (p) => {
+      if (gen !== generation) return; // stale worker, ignore
+      renderGrind(p.best?.bits ?? null, p.elapsed, p.tried);
+    });
+    if (gen !== generation) {
+      started.stop(); // cancelled while the challenge was in flight
+      return;
+    }
+    session = started;
   } catch (err) {
     $("progress").hidden = false;
     $("progress").textContent = `failed: ${(err as Error).message}`;
@@ -221,6 +234,7 @@ async function startGrinding() {
 }
 
 function cancelGrinding() {
+  generation++;
   session?.stop();
   session = null;
   setComposeState("idle");
@@ -247,6 +261,7 @@ async function submit() {
     await gb.post({ ...input, proof: outcome.proof });
     ($("text") as HTMLTextAreaElement).value = "";
     progress.textContent = "posted.";
+    generation++;
     session = null;
     setComposeState("idle");
     await refresh();

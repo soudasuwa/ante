@@ -31,7 +31,7 @@ The code is split so the boundary is obvious:
 | `web/src/guestbook.ts` | **no** | CBOR wire types, contract GET / delta UPDATE — what a client for *any* contract looks like |
 | `web/src/ante.ts` | **yes, all of it** | `attach` the delegate, `grind` a proof per post, `verify` proofs on display |
 | `web/src/main.ts` | glue | form → `ante.ts` for a proof → `guestbook.ts` to store it |
-| `contract/src/lib.rs` | one line | `entry.proof.verify(params.min_bits)?` in `validate_state` / `update_state` |
+| `contract/src/lib.rs` | two lines | bind the proof to the message, then `entry.proof.verify(params.min_bits)?` |
 
 ## The integration, in full
 
@@ -45,8 +45,9 @@ use ante_core::AnteProof;
 
 fn check(&self, params: &GuestbookParameters) -> Result<(), String> {
     // ... name / text length checks ...
-    if self.proof.purpose != params.purpose {
-        return Err("proof is for a different purpose".into());
+    // Bound to THIS message, not merely to the guestbook — see below.
+    if self.proof.purpose != content_purpose(&params.purpose, &self.name, &self.text) {
+        return Err("proof is not bound to this message".into());
     }
     self.proof.verify(params.min_bits).map(|_| ()).map_err(|e| format!("{e}"))
 }
@@ -55,6 +56,37 @@ fn check(&self, params: &GuestbookParameters) -> Result<(), String> {
 `min_bits` and `purpose` are **contract parameters** — the anti-spam policy is
 fixed when you publish, and part of the contract's address.
 
+### Bind the proof to the message, or the work is free
+
+An `AnteProof` commits to `(identity, purpose, nonce)` and **nothing else**. A
+fixed `purpose` therefore buys the author unlimited posts from a single grind:
+attach the same proof to any text and it still verifies. Worse, the challenge is
+`blake3(purpose ‖ vk)` and grinding starts at nonce 0, so the *same* search runs
+every time — an author with a lucky nonce early in their sequence re-finds it
+instantly, forever. That is a one-time toll, not per-post proof of work.
+
+The fix is to fold the message into the purpose:
+
+```rust
+pub fn content_purpose(prefix: &str, name: &str, text: &str) -> String {
+    let mut h = blake3::Hasher::new();
+    h.update(&(name.len() as u32).to_le_bytes());   // length-prefixed, so
+    h.update(name.as_bytes());                      // ("ab","c") and ("a","bc")
+    h.update(&(text.len() as u32).to_le_bytes());   // cannot collide
+    h.update(text.as_bytes());
+    format!("{prefix}:{}", hex(&h.finalize().as_bytes()[..8]))
+}
+```
+
+Now every distinct message is its own challenge and needs its own search.
+`content_purpose` is mirrored in `web/src/guestbook.ts` and the two are pinned
+against each other by the shared wire vector.
+
+**This generalises.** It is the same trick the whitepaper prescribes for
+freshness (`myapp:comment:2026-W12`): whatever a proof must be non-transferable
+across, put it in the purpose. If your app charges work per action, ask what an
+attacker could re-use one proof for, and bind that.
+
 ### 2. Producer — the web app (`web/src/ante.ts`)
 
 `@ante/client` offers two shapes, and which you pick is a product decision.
@@ -62,7 +94,7 @@ fixed when you publish, and part of the contract's address.
 **Fixed bar** — you choose the cost, the user waits:
 
 ```ts
-const outcome = await ante.commit("ante-guestbook:post:v1", { minBits: 16 });
+const outcome = await ante.commit(contentPurpose(name, text), { minBits: 16 });
 ```
 
 **Open-ended** — the *user* chooses the cost, by deciding when to stop. This is
@@ -73,7 +105,7 @@ import { AnteClient } from "@ante/client";
 
 const ante = await AnteClient.attach(fn);              // once, after connecting
 
-const session = await ante.grind("ante-guestbook:post:v1", {
+const session = await ante.grind(contentPurpose(name, text), {
   minBits: 16,                                          // the contract's floor
   onProgress: (p) => render(p.best?.bits ?? 0, p.elapsed),
 });
@@ -120,6 +152,8 @@ entry can be labelled with the work it demonstrates:
 ```ts
 import { verifyAnteProof } from "@ante/client";
 
+// Both halves: bound to this message, and clearing the bar.
+if (entry.proof.purpose !== contentPurpose(entry.name, entry.text)) return null;
 const result = verifyAnteProof(entry.proof, 16);
 if (result.ok) label(`${result.bits} bits`);
 ```

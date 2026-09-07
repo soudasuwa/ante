@@ -41,9 +41,9 @@ WebSocket API; there is nothing to render.
 | Contract | Instance | Parameters | Publish |
 |---|---|---|---|
 | ante-registry | `E8jXsQgvKkn1kzEpSDFwDRUbqZW3Tc1Z7BtmXQwyfb1J` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
-| guestbook example | `Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
+| guestbook example | `3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
 
-The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`Fw691…`).
+The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`3haJK…`).
 Two different ids for one example — that is the normal shape of a Freenet app,
 not a quirk of this one.
 
@@ -78,3 +78,4 @@ Kept so a stale id can be recognised rather than puzzled over.
 | What | Old id | Why it moved |
 |---|---|---|
 | ante-registry | `GFFaptbqcNprDPCkpQmRnLQLdeeXv6kDVSoiM5B6YThK` | doc-comment edits in `ante-core::registry` shifted the compiled bytes |
+| guestbook | `Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9` | proofs were not bound to the message, so one grind bought unlimited posts (see the guestbook README) |

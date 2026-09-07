@@ -18,7 +18,7 @@ import {
   type GrindSession,
 } from "@ante/client";
 
-import { GUESTBOOK_MIN_BITS, GUESTBOOK_PURPOSE } from "./guestbook";
+import { contentPurpose, GUESTBOOK_MIN_BITS } from "./guestbook";
 
 export type { GrindProgress, GrindSession };
 
@@ -34,14 +34,22 @@ export function attachAnte(fn: FreenetClient): Promise<AnteClient> {
 /// only turns true once the proof would actually be accepted.
 export function startPostGrind(
   ante: AnteClient,
+  name: string,
+  text: string,
   onProgress: (progress: GrindProgress) => void,
 ): Promise<GrindSession> {
-  return ante.grind(GUESTBOOK_PURPOSE, { minBits: GUESTBOOK_MIN_BITS, onProgress });
+  // Bound to this exact message, so the work cannot be reused for another.
+  return ante.grind(contentPurpose(name, text), {
+    minBits: GUESTBOOK_MIN_BITS,
+    onProgress,
+  });
 }
 
 /// Re-verify a displayed entry's proof. Returns the bits it demonstrates, or
 /// null if it does not clear the guestbook's bar / the signature is bad.
-export function checkProof(proof: AnteProof): number | null {
-  const result = verifyAnteProof(proof, GUESTBOOK_MIN_BITS);
+export function checkProof(entry: { name: string; text: string; proof: AnteProof }): number | null {
+  // Both halves matter: the proof must verify AND be bound to this message.
+  if (entry.proof.purpose !== contentPurpose(entry.name, entry.text)) return null;
+  const result = verifyAnteProof(entry.proof, GUESTBOOK_MIN_BITS);
   return result.ok ? result.bits : null;
 }

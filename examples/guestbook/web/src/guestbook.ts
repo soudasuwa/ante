@@ -7,6 +7,8 @@
 //  file is concerned it is just another part of the record.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { blake3 } from "@noble/hashes/blake3.js";
+
 import {
   anteProofToCborValue,
   asString,
@@ -14,7 +16,10 @@ import {
   cborEncode,
   contractKeyFromId,
   decodeAnteProofValue,
+  bytesToHex,
+  concatBytes,
   mapGet,
+  u32le,
   type AnteProof,
   type CborValue,
   type FreenetClient,
@@ -22,7 +27,7 @@ import {
 
 /// The published guestbook contract instance. Fill this in after
 /// `scripts/publish-guestbook.sh` prints the id, or pass `?contract=<id>`.
-const GUESTBOOK_CONTRACT_ID = "Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9";
+const GUESTBOOK_CONTRACT_ID = "3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL";
 
 /// Must match the parameters the contract was published with
 /// (`ANTE_GUESTBOOK_PURPOSE` / `ANTE_GUESTBOOK_MIN_BITS` in the publish script).
@@ -31,6 +36,23 @@ export const GUESTBOOK_MIN_BITS = 16;
 
 export const MAX_NAME_BYTES = 40;
 export const MAX_TEXT_BYTES = 500;
+
+/// The `purpose` a proof must carry to count for one specific message —
+/// mirrors `content_purpose` in the contract, and the two are pinned against
+/// each other by the shared wire vector.
+///
+/// Without this, a proof commits to (identity, purpose, nonce) and nothing
+/// else, so a single grind validates unlimited different posts — and since the
+/// challenge is fixed per (purpose, identity) and grinding starts at nonce 0,
+/// the author re-finds the same nonce for free every time. Folding the message
+/// in gives every post its own challenge and its own real search.
+export function contentPurpose(name: string, text: string): string {
+  const enc = new TextEncoder();
+  const n = enc.encode(name);
+  const t = enc.encode(text);
+  const tag = blake3(concatBytes(u32le(n.length), n, u32le(t.length), t));
+  return `${GUESTBOOK_PURPOSE}:${bytesToHex(tag.slice(0, 8))}`;
+}
 
 export function contractId(): string {
   return new URLSearchParams(location.search).get("contract") ?? GUESTBOOK_CONTRACT_ID;

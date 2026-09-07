@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@ante/client": "*",
-    "@freenetorg/freenet-stdlib": "^0.2.0"
+    "@freenetorg/freenet-stdlib": "^0.2.0",
+    "@noble/hashes": "^2.0.0"
   },
   "devDependencies": {
     "typescript": "^5.6",
