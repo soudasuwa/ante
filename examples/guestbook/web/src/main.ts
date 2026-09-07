@@ -113,9 +113,11 @@ async function sweepPredecessors() {
   const previous = deployments.contracts.guestbook.superseded;
   if (!gb || previous.length === 0) return;
 
+  // Silent unless there is something to say. A first-time visitor has no
+  // earlier guestbooks, and "did not answer" is not actionable — the sweep
+  // retries itself. Recovered and dropped posts DO matter: they explain why
+  // the list just changed, or why old posts are missing.
   const note = $("sweep-status");
-  note.hidden = false;
-  note.textContent = `checking ${previous.length} earlier guestbook${previous.length === 1 ? "" : "s"} for posts…`;
   try {
     const r = await probeGenerations(gbClient!, deployments.contracts.guestbook.instance, previous, {
       decode: (bytes) => carryableEntries(entriesInState(bytes)),
@@ -125,11 +127,10 @@ async function sweepPredecessors() {
 
     const parts: string[] = [];
     if (r.carried > 0) parts.push(`recovered ${r.carried} post${r.carried === 1 ? "" : "s"}`);
-    if (r.dropped > 0) parts.push(`${r.dropped} too old to carry`);
-    if (!r.complete) parts.push(`${r.unresolved.length} did not answer — will retry`);
+    if (r.dropped > 0) parts.push(`${r.dropped} too old to carry forward`);
 
-    if (parts.length === 0) note.hidden = true;
-    else {
+    if (parts.length > 0) {
+      note.hidden = false;
       note.textContent = parts.join(" · ");
       if (r.carried > 0) await refresh();
     }
