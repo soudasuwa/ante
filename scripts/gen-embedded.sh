@@ -52,6 +52,29 @@ export function delegateEmbedded(): boolean {
 }
 EOF
 
+# Keep deployments.json's delegate lineage in step, as a side effect of the
+# build rather than as something someone has to remember. The publish scripts
+# already do this for contracts, on the principle that a predecessor which is
+# not recorded is state a future migration cannot reach — and the delegate is
+# the one whose lineage strands people's IDENTITIES, so it is the last place to
+# rely on memory. Idempotent: only moves `current` aside when it really changed.
+KEY_HEX="$(echo "$KEYINFO" | awk '$1 == "key_hex" {print $2}')"
+CODE_HASH_HEX="$(echo "$KEYINFO" | awk '$1 == "code_hash_hex" {print $2}')"
+python3 - "$REPO_ROOT/deployments.json" "$KEY_HEX" "$CODE_HASH_HEX" <<'PYEOF'
+import json, sys
+path, key, code_hash = sys.argv[1:4]
+d = json.load(open(path))
+cur = d["delegate"].get("current", {})
+if cur.get("key") and cur["key"] != key:
+    sup = d["delegate"].setdefault("superseded", [])
+    if not any(e.get("key") == cur["key"] for e in sup):
+        sup.insert(0, {k: cur[k] for k in ("key", "codeHash") if k in cur})
+        print(f"  lineage: delegate {cur['key'][:16]}… -> superseded")
+d["delegate"]["current"] = {"key": key, "codeHash": code_hash}
+json.dump(d, open(path, "w"), indent=2)
+open(path, "a").write("\n")
+PYEOF
+
 echo "wrote $OUT"
 echo "  delegate: $(wc -c < "$WASM") bytes  key ${KEY:0:24}…"
 echo "  registry: ${REGISTRY_ID:-<none>}"
