@@ -25,8 +25,18 @@ import {
   type FreenetClient,
 } from "@ante/client";
 
-/// The published guestbook contract instance. Fill this in after
-/// `scripts/publish-guestbook.sh` prints the id, or pass `?contract=<id>`.
+/// The published guestbook contract instance. Baked in at build time and NOT
+/// overridable at runtime.
+///
+/// A `?contract=<id>` parameter would let anyone hand out a link that is the
+/// genuine guestbook — genuine address, genuine code — showing data they
+/// control. The address bar would vouch for content the owner never published.
+///
+/// So the pointer is this constant, and the authority to move it is the
+/// website's publisher key: changing where the app reads from means
+/// republishing the site, which only the key holder can do. That is the same
+/// trust root, with nothing extra to run. To point a local build somewhere
+/// else, edit this line and rebuild.
 const GUESTBOOK_CONTRACT_ID = "3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL";
 
 /// Must match the parameters the contract was published with
@@ -55,7 +65,7 @@ export function contentPurpose(name: string, text: string): string {
 }
 
 export function contractId(): string {
-  return new URLSearchParams(location.search).get("contract") ?? GUESTBOOK_CONTRACT_ID;
+  return GUESTBOOK_CONTRACT_ID;
 }
 
 /// One guestbook entry — mirrors `Entry` in the contract crate.

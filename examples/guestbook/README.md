@@ -172,13 +172,19 @@ install` at the repo root).
 ./scripts/publish-guestbook.sh                   # build + publish the contract, prints an id
 ```
 
-Put the printed id in `web/src/guestbook.ts` (`GUESTBOOK_CONTRACT_ID`), or pass
-it as a query param, then:
+Put the printed id in `web/src/guestbook.ts` (`GUESTBOOK_CONTRACT_ID`) — it is
+build-time only, with no runtime override, so edit and rebuild:
 
 ```bash
 npm run dev --workspace ante-guestbook-web
-# open http://localhost:5173/?node=127.0.0.1:7509&contract=<id>
+# open http://localhost:5173/?node=127.0.0.1:7509
 ```
+
+`?node=` works only in a dev build. Nothing published reads an address from the
+URL: a parameter that repoints the contract, the node, or the "back up your
+key" link would let a crafted link show attacker data — or phish a recovery
+code — under the genuine app's address. See
+[DEPLOYMENTS.md](../../DEPLOYMENTS.md#who-can-move-a-pointer).
 
 ## Publish it to Freenet
 

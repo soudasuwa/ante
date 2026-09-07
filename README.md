@@ -88,6 +88,13 @@ npm run dev --workspace web              # the UI, against your local node
 `http://localhost:5173/?node=127.0.0.1:7509`. Served through the node's gateway
 it needs no param.
 
+That parameter is honoured **only in a dev build** and is stripped from anything
+published. A URL parameter that repoints the node hands over the whole trust
+root — an attacker who gets you to open the genuine app with their node in the
+query string serves your state and draws your consent prompts, with the real
+address in the bar. For the same reason no published page reads a contract id
+from the URL: see [DEPLOYMENTS.md](DEPLOYMENTS.md#who-can-move-a-pointer).
+
 An app integrates ante through the `@ante/client` package — never by talking to
 the delegate directly. See [examples/guestbook/](examples/guestbook/).
 

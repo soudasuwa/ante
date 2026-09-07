@@ -28,8 +28,15 @@ export function contractKeyFromId(instanceId: string): ContractKey {
 }
 
 export function wsApiUrl(): URL {
-  const override = new URLSearchParams(location.search).get("node");
-  const host = override ?? location.host;
+  // `?node=` exists so `vite dev`, which serves on its own origin, can reach a
+  // node. It is honoured ONLY in a dev build. In anything published it is
+  // ignored, because a URL parameter that repoints the node is a handover of
+  // the whole trust root: an attacker who gets someone to open the real app
+  // with their node in the query string sees every delegate request, serves
+  // whatever state they like, and draws the consent prompts. The address bar
+  // would still show the genuine app.
+  const host = (import.meta.env?.DEV && new URLSearchParams(location.search).get("node"))
+    || location.host;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return new URL(`${proto}://${host}/v1/contract/command`);
 }

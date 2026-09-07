@@ -30,6 +30,12 @@ In scope:
 - `@ante/client` — issuing `ExportIdentity` / `ImportIdentity` the user did not
   initiate, or a recovery code that decodes to a key other than the fingerprint
   shown next to it.
+- **Any published page taking an address from the URL.** A parameter that
+  repoints the node, a contract, or a link target lets a crafted link render
+  attacker-controlled data — or send someone to a clone that asks for their
+  recovery code — while the address bar shows the genuine app. Addresses are
+  fixed at build time; `?node=` is dev-build only and must stay
+  dead-code-eliminated from published bundles.
 - `contracts/ante-registry` — admitting an invalid or overstated proof,
   lowering a level, breaking convergence.
 - The TypeScript verifier (`client/src/ante-proof.ts`) drifting from

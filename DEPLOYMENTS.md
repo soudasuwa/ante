@@ -57,8 +57,28 @@ the existing instance without republishing:
   E8jXsQgvKkn1kzEpSDFwDRUbqZW3Tc1Z7BtmXQwyfb1J
 ```
 
-The guestbook example additionally hardcodes its contract id in
-`examples/guestbook/web/src/guestbook.ts`; `?contract=<id>` overrides it.
+## Who can move a pointer
+
+Every address an app reads is **fixed at build time**. No published page takes a
+contract id, a node, or a link target from the URL.
+
+That is deliberate. A `?contract=` parameter would let anyone hand out a link
+that is the genuine app — genuine address, genuine code, genuine publisher —
+displaying data they control, with the address bar vouching for it. A `?vault=`
+one was worse: it aimed the *"back up your key"* link, so a link to the real
+guestbook could send someone to a clone that asks them to paste their recovery
+code. Both are gone; `?node=` survives only in `vite dev` builds and is
+dead-code-eliminated from anything published.
+
+So the pointer is the published bundle, and the authority to move it is the
+**website's publisher key**: changing where an app reads from means republishing
+the site, which only the key holder can do. A separate signed pointer contract
+would add a moving part without adding a guarantee — it would rest on the same
+key. It becomes worth building only if the target must change *without* a site
+republish, or if third-party apps need to discover these contracts on their own.
+
+To point a local build somewhere else, edit the constant and rebuild:
+`examples/guestbook/web/src/guestbook.ts` (`GUESTBOOK_CONTRACT_ID`).
 
 ## Delegate
 

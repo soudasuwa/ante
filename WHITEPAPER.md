@@ -892,6 +892,7 @@ would strand every secret. Send something stable.
 | Get a proof without the user noticing | every first spend per app prompts; grants are explicit, listed and revocable |
 | Extract the private key | it never leaves the delegate except through `ExportIdentity`, which always prompts |
 | Claim an app's grant | the origin tag is runtime-attested, not self-reported |
+| Serve fake state, or phish a recovery code, under the genuine app's address | no published page reads an address from the URL — see below |
 | Inflate a level in the registry | every stored proof is re-verified on read |
 | Lower someone's level | the merge is monotonic |
 | Grind cheaply and flood | **not defended** — app policy (`min_bits`, per-author caps) |
@@ -902,6 +903,35 @@ would strand every secret. Send something stable.
 and draws the consent prompts). The consumer trusts nothing — verification is
 self-contained. No party is trusted to report work honestly, because nobody
 reports work; it is recomputed.
+
+### An address must never come from the URL
+
+A Freenet app's address is its strongest signal: content-addressed code, a
+permanent URL, a publisher key nobody else holds. A query parameter that
+repoints anything throws that away while keeping the appearance of it.
+
+We shipped three and removed them all:
+
+- `?contract=` — a link to the genuine guestbook, at its genuine address,
+  showing data the sender controls.
+- `?node=` — worse. The node is the whole trust root: it holds the secret
+  store and it *draws the consent prompts*. Repointing it means the attacker
+  serves the state and renders the dialog asking you to approve things.
+- `?vault=` — worst. It aimed the app's own *"back up your key"* link, so a
+  link to the real guestbook could deliver someone to a clone that asks them to
+  paste their recovery seed.
+
+Every address is now fixed at build time. `?node=` survives only in `vite dev`
+builds, gated on `import.meta.env.DEV` and verifiably dead-code-eliminated from
+published bundles (`grep 'get("node")' dist/assets/*.js` → zero).
+
+**The pointer is the published bundle, and its update authority is the
+website's publisher key.** Changing where an app reads from requires
+republishing the site, which only the key holder can do. A separate signed
+pointer contract would rest on that same key, so it adds a moving part without
+adding a guarantee; it earns its place only when the target must change without
+a site republish, or when third-party apps need to discover the contracts
+themselves.
 
 ---
 

@@ -41,10 +41,16 @@ interface Shown {
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
-/// The ante identity app, for the "back up your key" link. Safe to hardcode:
-/// an `fdev website` address is blake3(container_wasm ‖ publisher_key), and
-/// neither input contains the site content — so unlike a data contract, this
-/// URL is permanent and survives every update. `?vault=<id>` overrides it.
+/// The ante identity app, for the "back up your key" link. Fixed at build time
+/// and deliberately NOT overridable at runtime.
+///
+/// This link asks the visitor to go and handle their recovery code, so aiming
+/// it is the most dangerous thing a query parameter could do here: a link to
+/// the real guestbook with someone else's app in the query string sends people
+/// to a convincing clone that asks them to paste the seed. Hardcoding costs
+/// nothing — an `fdev website` address is blake3(container_wasm ‖
+/// publisher_key), so unlike a data contract this URL is permanent across
+/// every update.
 const ANTE_APP = "AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r";
 
 let gb: Guestbook | null = null;
@@ -142,8 +148,7 @@ function render(shown: Shown[]) {
 /// one when they do not.
 function showIdentityNote(identityVk: Uint8Array) {
   $("my-fingerprint").textContent = fingerprint(identityVk);
-  const vault = new URLSearchParams(location.search).get("vault") ?? ANTE_APP;
-  ($("backup-link") as HTMLAnchorElement).href = `/v1/contract/web/${vault}/`;
+  ($("backup-link") as HTMLAnchorElement).href = `/v1/contract/web/${ANTE_APP}/`;
   $("identity-note").hidden = false;
 }
 
