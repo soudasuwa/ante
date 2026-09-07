@@ -367,9 +367,10 @@ function renderLevel() {
 }
 
 function updateImproveLabel() {
-  const n = Number(($("improve-bits") as HTMLInputElement).value) || 0;
-  $("improve-go").textContent =
-    currentLevel === null ? `Prove identity — ${n} bits` : `Improve to ${n} bits`;
+  // The target is in the input immediately to the left, so repeating it here
+  // said the same number twice and made the button restate its own argument.
+  // The button is just the verb.
+  $("improve-go").textContent = currentLevel === null ? "Prove identity" : "Improve";
 }
 
 function gridProgress(el: HTMLElement) {
