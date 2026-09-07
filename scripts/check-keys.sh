@@ -159,6 +159,20 @@ PYEOF
 # A contract's published instance is BLAKE3(code_hash ‖ params), so a stable
 # code_hash here plus unchanged params means a stable address. The live
 # instance ids are in DEPLOYMENTS.md.
+
+# The canonical build is the fixed-path container (build/Dockerfile). These
+# values cannot be reproduced by a host build — cargo hashes a path dependency's
+# absolute path into -C metadata — so check-keys.sh verifies them THROUGH the
+# container rather than pretending a local build can.
+#
+# Emitted here rather than written by hand because it was written by hand once,
+# and the next accepted re-key regenerated this file from the template and
+# silently dropped it. That put the guard back into comparing host bytes against
+# container-recorded keys: a comparison that can only ever disagree, and which
+# duly reported a re-key that had not happened.
+[build]
+canonical = "container"
+
 [delegate]
 code_hash = "$DELEGATE_CODE_HASH"
 key = "$DELEGATE_KEY"

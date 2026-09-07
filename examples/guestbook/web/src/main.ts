@@ -8,7 +8,8 @@ import { FreenetClient, fingerprint } from "@ante/client";
 
 import deployments from "../../../../deployments.json";
 
-import { attachAnte, carryableEntries, checkProof, startPostGrind, type GrindSession } from "./ante";
+import { attachAnte, carryableEntries, checkProof } from "./ante";
+import { contentPurpose } from "./guestbook";
 import { probeGenerations } from "@ante/client";
 
 import {
@@ -62,7 +63,6 @@ let gb: Guestbook | null = null;
 let gbClient: import("@ante/client").FreenetClient | null = null;
 let ante: Awaited<ReturnType<typeof attachAnte>> | null = null;
 /// The in-flight grind, if the compose form is currently working.
-let session: GrindSession | null = null;
 /// Bumped whenever a grind is started or abandoned. A worker whose generation
 /// no longer matches is stale: it must not paint the readout, and if it arrives
 /// after a cancel it must be terminated rather than left running forever.
@@ -77,9 +77,7 @@ function status(text: string, kind: "" | "ok" | "err" = "") {
 async function boot() {
   ($("home-link") as HTMLAnchorElement).href =
     `/v1/contract/web/${deployments.sites.home.contract}/`;
-  $("start").addEventListener("click", () => void startGrinding());
-  $("post").addEventListener("click", () => void submit());
-  $("cancel").addEventListener("click", cancelGrinding);
+  $("start").addEventListener("click", () => void signAndPost());
 
   if (!contractId()) {
     status("no guestbook contract configured — see the README", "err");
@@ -232,37 +230,25 @@ function entryCard({ entry, bits }: Shown): HTMLElement {
 // to wait, decided while you watch, on whatever hardware you happen to have.
 
 function setComposeState(state: "idle" | "grinding" | "posting") {
-  ($("start") as HTMLButtonElement).hidden = state !== "idle";
-  ($("post") as HTMLButtonElement).hidden = state === "idle";
-  ($("cancel") as HTMLButtonElement).hidden = state === "idle";
-  ($("post") as HTMLButtonElement).disabled = state === "posting";
-  ($("cancel") as HTMLButtonElement).disabled = state === "posting";
-  $("grind-panel").hidden = state === "idle";
-  $("start-hint").hidden = state !== "idle";
-  for (const id of ["name", "text"]) {
-    ($(id) as HTMLInputElement).disabled = state !== "idle";
+  const busy = state !== "idle";
+  ($("start") as HTMLButtonElement).disabled = busy;
+  ($("start") as HTMLButtonElement).textContent = busy ? "Working…" : "Sign & post";
+  $("grind-panel").hidden = !busy;
+  $("start-hint").hidden = busy;
+  // The proof binds this exact wording and this exact level, so all three are
+  // fixed for the duration. Editing any of them would throw the work away.
+  for (const id of ["name", "text", "level"]) {
+    ($(id) as HTMLInputElement).disabled = busy;
   }
 }
 
-function renderGrind(bits: number | null, elapsed: number, tried = 0) {
-  const post = $("post") as HTMLButtonElement;
-  // Show the hash count next to the bit count: expected work for N bits is 2^N,
-  // so the two together are a sanity check anyone can do by eye.
+function renderGrind(elapsed: number, tried = 0) {
+  // No live bit count any more. The target was chosen before the work started,
+  // so the only honest thing to report is progress toward it — a climbing
+  // number would imply a choice the user already made.
+  $("grind-bits").textContent = "working…";
   $("grind-elapsed").textContent =
     `${elapsed.toFixed(0)}s · ${tried.toLocaleString()} hashes`;
-
-  if (bits === null || bits < GUESTBOOK_MIN_BITS) {
-    $("grind-bits").textContent = "…";
-    $("grind-tier").textContent = `below ${GUESTBOOK_MIN_BITS} bits`;
-    post.disabled = true;
-    post.textContent = "Post";
-    return;
-  }
-  const tier = tierOf(bits);
-  $("grind-bits").textContent = `${bits} bits`;
-  $("grind-tier").textContent = tier.label;
-  post.disabled = false;
-  post.textContent = `Post at ${bits} bits`;
 }
 
 function composeInput(): { name: string; text: string } | null {
@@ -283,84 +269,63 @@ function composeInput(): { name: string; text: string } | null {
   return { name, text };
 }
 
-async function startGrinding() {
+/// Post at the level the user chose: one bounded operation, start to finish.
+///
+/// This used to be an open-ended grind the user stopped by hand, and that made
+/// the consent prompt dishonest. It asked to spend "at least 16 bits (about a
+/// second)" and then ran until someone clicked stop — so the estimate the user
+/// agreed to bore no relation to what was actually spent. Choosing a level up
+/// front means the prompt names the real cost, the work stops there, and the
+/// second click disappears along with the problem.
+async function signAndPost() {
   const input = composeInput();
-  if (!ante || session || !input) return;
+  if (!ante || !gb || !input) return;
 
-  const gen = ++generation;
-  setComposeState("grinding");
-  renderGrind(null, 0, 0);
+  const minBits = Number(($("level") as HTMLSelectElement).value);
   const progress = $("progress");
+  const gen = ++generation;
+  const started = performance.now();
+  setComposeState("grinding");
+  renderGrind(0, 0);
+
   try {
-    const started = await startPostGrind(
-      ante,
-      input.name,
-      input.text,
-      (p) => {
-        if (gen !== generation) return; // stale worker, ignore
-        renderGrind(p.best?.bits ?? null, p.elapsed, p.tried);
+    const outcome = await ante.commit(contentPurpose(input.name, input.text), {
+      minBits,
+      onProgress: (tried) => {
+        if (gen !== generation) return;
+        renderGrind((performance.now() - started) / 1000, tried);
       },
-      () => {
-        // The node is asking before anything is spent, so say that rather than
-        // letting the panel claim work is happening when none has started.
+      onPrompt: () => {
         progress.hidden = false;
         progress.textContent = "approve on your node to begin — nothing is spent yet";
       },
-    );
-    progress.hidden = true;
-    if (gen !== generation) {
-      started.stop(); // cancelled while the challenge was in flight
+    });
+    if (gen !== generation) return;
+
+    if (outcome.kind === "denied") {
+      progress.hidden = false;
+      progress.textContent = "you declined — nothing was spent";
+      setComposeState("idle");
       return;
     }
-    session = started;
+
+    progress.hidden = false;
+    progress.textContent = "posting…";
+    await gb.post({ ...input, proof: outcome.proof });
+    ($("text") as HTMLTextAreaElement).value = "";
+    const achieved = checkProof({ ...input, proof: outcome.proof }) ?? minBits;
+    progress.textContent = `posted at ${achieved} bits.`;
+    showIdentityNote(outcome.proof.identityVk);
+    setComposeState("idle");
+    await refresh();
   } catch (err) {
     progress.hidden = false;
-    // Declining is not a failure. It is the feature working, and it should not
-    // be rendered in the same words as a broken node.
+    // Declining is the feature working; it must not read like a broken node.
     progress.textContent =
       (err as Error).name === "GrindDeniedError"
         ? "you declined — nothing was spent"
         : `failed: ${(err as Error).message}`;
-    cancelGrinding();
-  }
-}
-
-function cancelGrinding() {
-  generation++;
-  session?.stop();
-  session = null;
-  setComposeState("idle");
-}
-
-async function submit() {
-  const input = composeInput();
-  if (!gb || !session || !input) return;
-
-  const progress = $("progress");
-  setComposeState("posting");
-  progress.hidden = false;
-  try {
-    const outcome = await session.commit({
-      onPrompt: () => (progress.textContent = "approve the prompt on your node (you have 60 s)…"),
-    });
-    if (outcome.kind === "denied") {
-      progress.textContent = "you declined the prompt — nothing was posted";
-      setComposeState("grinding"); // the proof is still good; they can retry
-      return;
-    }
-
-    progress.textContent = "posting…";
-    await gb.post({ ...input, proof: outcome.proof });
-    ($("text") as HTMLTextAreaElement).value = "";
-    progress.textContent = "posted.";
-    showIdentityNote(outcome.proof.identityVk);
-    generation++;
-    session = null;
     setComposeState("idle");
-    await refresh();
-  } catch (err) {
-    progress.textContent = `failed: ${(err as Error).message}`;
-    setComposeState("grinding");
   }
 }
 

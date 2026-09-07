@@ -68,7 +68,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   font: inherit;
   color: var(--ink);
   padding: 0.5rem 0.6rem;
@@ -83,7 +84,8 @@ textarea {
    appearance — so a locked input rendered exactly like an editable one and the
    only clue was that typing did nothing. */
 input:disabled,
-textarea:disabled {
+textarea:disabled,
+select:disabled {
   background: var(--disabled-bg, #f1f0ee);
   color: var(--muted);
   cursor: not-allowed;
@@ -91,7 +93,8 @@ textarea:disabled {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }

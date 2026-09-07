@@ -26,38 +26,41 @@
           Message
           <textarea id="text" rows="3" maxlength="500" placeholder="say hello"></textarea>
         </label>
+        <label>
+          Commitment
+          <select id="level">
+            <option value="16" selected>16 bits — about a second</option>
+            <option value="18">18 bits — a few seconds</option>
+            <option value="20">20 bits — around ten seconds</option>
+            <option value="22">22 bits — up to a minute</option>
+            <option value="24">24 bits — a minute or more</option>
+          </select>
+        </label>
         <p id="start-hint" class="muted">
           Your <strong>Ante key</strong> is an identity your own Freenet node
           holds for you — no signup, no email, nothing to remember. Posting
           spends a little computing time with it, as proof you are not a spam
-          script. You choose how much: the longer it runs, the higher your
-          message sits. Nothing is posted until you confirm.
+          script. Every level is a normal post; spending more places your
+          message higher up the page. Your node will ask before anything is
+          spent.
         </p>
 
         <div id="grind-panel" hidden>
-          <div class="grind-live">
-            <strong id="grind-bits">…</strong>
-            <span id="grind-tier" class="badge"></span>
+          <p id="grind-live" class="grind-live">
+            <strong id="grind-bits">working…</strong>
             <span id="grind-elapsed" class="muted"></span>
-          </div>
-          <p class="muted">
-            Working. Each extra bit takes about twice as long as the last, so
-            this climbs quickly then slows down — stop whenever you are happy.
-            Your node will ask you to confirm before anything is posted.
           </p>
           <p class="muted">
             Your name and message are locked while this runs: the proof is tied
             to their exact wording, so changing a character would throw the work
-            away. Cancel to edit them.
+            away.
           </p>
         </div>
 
         <div class="actions">
-          <button id="start">Sign with Ante key</button>
-          <button id="post" hidden disabled>Post</button>
-          <button id="cancel" class="ghost" hidden>Stop</button>
+          <button id="start">Sign &amp; post</button>
+          <p id="progress" class="progress" hidden></p>
         </div>
-        <p id="progress" class="progress" hidden></p>
 
         <div id="identity-note" class="identity-note" hidden>
           <p>
