@@ -37,11 +37,17 @@ export function startPostGrind(
   name: string,
   text: string,
   onProgress: (progress: GrindProgress) => void,
+  onPrompt?: () => void,
 ): Promise<GrindSession> {
   // Bound to this exact message, so the work cannot be reused for another.
+  //
+  // grind() asks the node for permission BEFORE spending anything, so the
+  // prompt names this message and this bar while refusing is still free. The
+  // work starts only once the user has agreed to it.
   return ante.grind(contentPurpose(name, text), {
     minBits: GUESTBOOK_MIN_BITS,
     onProgress,
+    onPrompt,
   });
 }
 

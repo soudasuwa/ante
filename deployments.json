@@ -33,9 +33,14 @@
   },
   "delegate": {
     "current": {
-      "key": "9bd564363501d32f7090f4d10f05e8c43216564e7105dd4ee04f9a30dd4c042c",
-      "codeHash": "4a17d7af00f769a76e94a235dad15314d3fb145a9c71222fa1b6ecc14491c9c7"
+      "key": "6c1db69c6c17acf4cd3e98e65d48451e49e2936317801a855c34ccc93aa608de",
+      "codeHash": "f10f40a38f2429f5499f503948001b2fd3a8e2923309ede75c47c9f0ce78925f"
     },
-    "superseded": []
+    "superseded": [
+      {
+        "key": "9bd564363501d32f7090f4d10f05e8c43216564e7105dd4ee04f9a30dd4c042c",
+        "codeHash": "4a17d7af00f769a76e94a235dad15314d3fb145a9c71222fa1b6ecc14491c9c7"
+      }
+    ]
   }
 }

@@ -72,6 +72,24 @@ pub enum AnteRequest {
     /// current seed is a no-op.
     ImportIdentity { seed: Vec<u8> },
 
+    /// Ask the user, BEFORE any work is done, to authorize grinding
+    /// `min_bits` for `purpose`. **Prompts**, unless this app already holds an
+    /// "always allow" grant.
+    ///
+    /// On approval the delegate parks a single-use authorization and returns
+    /// the challenge bytes, so the caller can grind and then `Commit` without
+    /// a second prompt. On refusal, `Denied` — and no work has been spent.
+    ///
+    /// This exists because consent should precede a cost, not follow it. The
+    /// old order asked "the work is already done: 25 bits, allow?", which puts
+    /// the user's only decision after the only expensive part, and makes a
+    /// refusal cost them the grind they just paid for.
+    ///
+    /// Optional. `Commit` still prompts on its own for a caller that never
+    /// asked, so this is an improvement a consumer opts into rather than a
+    /// break.
+    RequestGrind { purpose: String, min_bits: u32 },
+
     /// Report whether this delegate generation holds an identity, WITHOUT
     /// creating one. No prompt.
     ///
@@ -124,6 +142,12 @@ pub enum AnteResponse {
     /// The request could not be served (malformed payload, nonce below
     /// `min_bits`, purpose too long, entropy failure, ...).
     Error { message: String },
+
+    /// Grinding was authorized: `bytes` is the challenge preimage, exactly as
+    /// [`AnteResponse::Challenge`] returns it. Distinct from `Challenge`
+    /// because it also means "a single-use authorization is parked, and the
+    /// matching `Commit` will not prompt again".
+    GrindAuthorized { bytes: Vec<u8> },
 
     /// This delegate generation holds no identity, in answer to
     /// [`AnteRequest::HasIdentity`]. Distinct from `Error` because "there is

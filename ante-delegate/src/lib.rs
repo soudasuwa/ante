@@ -26,6 +26,7 @@
 //! import use the same round-trip — they are the only way the secret seed
 //! leaves or enters the delegate, and both always prompt.
 
+mod authz;
 mod consent;
 mod env;
 mod grants;
@@ -93,6 +94,27 @@ fn dispatch(
             }
         }
 
+        AnteRequest::RequestGrind { purpose, min_bits } => {
+            if let Err(message) = handler::check_purpose(&purpose) {
+                return Ok(vec![reply(&AnteResponse::Error { message })]);
+            }
+            let key = match identity::load_or_create(env) {
+                Ok(k) => k,
+                Err(message) => return Ok(vec![reply(&AnteResponse::Error { message })]),
+            };
+            let vk = key.verifying_key().to_bytes();
+            let bytes = pow::challenge_bytes(&purpose, &vk);
+
+            // An app the user already trusts is not asked again — that grant is
+            // exactly the mechanism that makes asking-first bearable rather
+            // than a popup per action.
+            let tag = identity::origin_tag(origin);
+            if grants::is_granted(env, &tag) {
+                return Ok(vec![reply(&AnteResponse::GrindAuthorized { bytes })]);
+            }
+            consent::emit_grind_prompt(env, origin, &vk, &purpose, min_bits)
+        }
+
         // Deliberately `load_existing`, not `load_or_create`: this is the one
         // identity request that must never write. See AnteRequest::HasIdentity.
         AnteRequest::HasIdentity => Ok(vec![reply(&match identity::load_existing(env) {
@@ -135,11 +157,23 @@ fn dispatch(
             }
 
             // A prior "Always allow" from this app signs without a prompt.
-            if grants::is_granted(env, &identity::origin_tag(origin)) {
+            let tag = identity::origin_tag(origin);
+            if grants::is_granted(env, &tag) {
                 return Ok(vec![reply(&consent::signed_commit(
                     &key, purpose, nonce, ts,
                 ))]);
             }
+            // Or the user authorized exactly this grind before it started, in
+            // which case the decision has already been taken and asking again
+            // would be asking twice for one thing. Single-use: consumed here.
+            if authz::consume(env, &tag, &purpose, min_bits) {
+                return Ok(vec![reply(&consent::signed_commit(
+                    &key, purpose, nonce, ts,
+                ))]);
+            }
+            // Nobody asked first. Prompt now, as before — a caller that never
+            // learned about RequestGrind still works, it just pays for the
+            // grind before finding out whether it was wanted.
             consent::emit_commit_prompt(env, origin, &vk, &purpose, nonce, achieved, ts)
         }
 

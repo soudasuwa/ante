@@ -384,11 +384,14 @@ async function runImprove() {
       minBits: target,
       onProgress: gridProgress(progress),
       onPrompt: () => {
-        progress.textContent = "approve the prompt on your node (you have 60 s)…";
+        // The prompt now comes BEFORE the grind, so this can promise something
+        // the old order could not: refusing costs nothing.
+        progress.textContent =
+          "approve on your node to begin (you have 60 s) — nothing is spent yet";
       },
     });
     if (outcome.kind === "denied") {
-      progress.textContent = "you declined the prompt — nothing was signed";
+      progress.textContent = "you declined — no work was spent and nothing was signed";
       return;
     }
 

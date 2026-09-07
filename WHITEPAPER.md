@@ -253,6 +253,62 @@ non-canonical signature encodings, closing the malleability classes that make
 `MAX_PURPOSE_BYTES = 256` exists to stop a hostile caller putting a megabyte of
 text into a consent prompt or a stored proof.
 
+### 4.4b Consent before the cost
+
+The delegate does not grind. A Freenet delegate is a single-threaded,
+message-driven `process()`, so a 10–60 second search inside it would block the
+node's contract executor for the duration. The work therefore happens in the
+app's own worker, and the delegate only signs.
+
+That is a hard constraint, but it quietly imposed a soft one that turned out to
+be wrong: because only the signature needed authorising, the prompt was raised
+at signing time — *after* the grind. Three things follow, and none of them are
+good. A refusal costs the user the work they just paid for. The only decision
+they make arrives after the only expensive part. And the prompt has to say
+something like "the work is already done: 25 bits, allow?", which asks about a
+cost already sunk.
+
+So the consent moves to the front without the delegate doing the work:
+
+```
+RequestGrind { purpose, min_bits }
+  → the node asks: "<app> wants to spend some of this device's CPU,
+     at least 18 bits (a few seconds), for <purpose>. Nothing spent yet."
+  → on approval the delegate parks a single-use authorization and returns
+     the challenge
+app grinds in its worker
+Commit { purpose, nonce, min_bits, ts }
+  → the parked authorization is consumed; no second prompt
+```
+
+The authorization is scoped to `(origin_tag, purpose, min_bits)` and consumed on
+use. Each of those is load-bearing. The origin is runtime-attested, so one app
+cannot spend another's approval. `purpose` is exact, so for a content-bound
+caller an approval to post *this* message cannot sign a different one. `min_bits`
+must match, or an app could show 16 in the prompt and spend the approval on a
+commit claiming something else — the number would be decoration.
+
+**Single-use rather than time-limited, and that is forced.** The delegate has no
+clock. `ts` comes from the caller and is unauthenticated (§3), so any expiry
+would be a number the caller sets. Consumption is the only bound that cannot be
+lied about.
+
+`Commit` still prompts by itself when it finds no authorization, so an app that
+never learned about `RequestGrind` keeps working — it just pays for the grind
+before finding out whether it was wanted. Asking first is an improvement a
+consumer opts into, not a break.
+
+**Why this matters beyond the UX.** Nothing today stops a Freenet app from
+grinding — or mining — in a worker without asking anyone. ante cannot change
+that; enforcement would have to come from the platform. What ante can do is
+demonstrate that the *policy* side is tractable: that an app can be made to
+declare what it wants to spend and what for, before it spends it, and that a
+user can answer once and not be pestered again. "Always allow" is the answer to
+the strongest objection against ever requiring such consent — that it would mean
+a prompt per action. It does not. If a platform ever wants to gate computation
+on user consent, the surface it would need already exists and already has
+adopters.
+
 ### 4.5 What a proof does *not* bind — the sharpest footgun
 
 A proof commits to `(identity_vk, purpose, nonce, ts)`. **That is the complete

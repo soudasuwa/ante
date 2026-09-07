@@ -70,6 +70,10 @@ export interface GrindOptions {
   minBits?: number;
   /// Called on every improvement, and periodically in between.
   onProgress?: (progress: GrindProgress) => void;
+  /// Fired just before the authorization prompt appears on the node, so the UI
+  /// can say what is about to happen. The prompt now precedes the work, so this
+  /// fires first rather than after the grind.
+  onPrompt?: () => void;
 }
 
 /// An open-ended grind the caller stops when satisfied — for apps where the
@@ -113,6 +117,20 @@ export interface StrandedSearch {
   unresponsive: PreviousDelegate[];
 }
 
+/// Thrown when the user refuses to authorize a grind before it starts.
+///
+/// A distinct type because refusal is not a failure: nothing went wrong, the
+/// person said no, and an app should say so plainly rather than render it as an
+/// error. `grind()` throws it because a GrindSession has nothing meaningful to
+/// return; `commit()` returns `{ denied: true }` instead, matching how it
+/// already reports a refusal at signing time.
+export class GrindDeniedError extends Error {
+  constructor() {
+    super("you declined to spend the work");
+    this.name = "GrindDeniedError";
+  }
+}
+
 export class AnteClient {
   private constructor(
     private readonly client: FreenetClient,
@@ -146,9 +164,13 @@ export class AnteClient {
   /// write; `outcome.proof` is the decoded form.
   async commit(purpose: string, opts: CommitOptions = {}): Promise<CommitOutcome> {
     const minBits = opts.minBits ?? 18;
-    const challenge = await this.challenge(purpose);
-    const nonce = await grindInWorker(challenge, minBits, opts.onProgress);
-    return this.signCommit(purpose, nonce, minBits, opts.onPrompt);
+    // Consent first: a refusal here costs nothing, where a refusal after the
+    // grind costs the user everything they just spent.
+    const authorized = await this.requestGrind(purpose, minBits, { onPrompt: opts.onPrompt });
+    if (authorized.denied) return { kind: "denied" };
+    const nonce = await grindInWorker(authorized.challenge, minBits, opts.onProgress);
+    // Not prompted again: the delegate consumes the authorization it parked.
+    return this.signCommit(purpose, nonce, minBits);
   }
 
   /// Look for an identity stranded in an earlier delegate generation.
@@ -257,7 +279,11 @@ export class AnteClient {
   ///   const outcome = await session.commit();
   async grind(purpose: string, opts: GrindOptions = {}): Promise<GrindSession> {
     const minBits = opts.minBits ?? 18;
-    const challenge = await this.challenge(purpose);
+    // Ask before spending, not after. An open-ended grind can run for minutes;
+    // discovering at the end that it was unwanted is the worst possible moment.
+    const authorized = await this.requestGrind(purpose, minBits, { onPrompt: opts.onPrompt });
+    if (authorized.denied) throw new GrindDeniedError();
+    const challenge = authorized.challenge;
     const worker = new PowWorker();
     const started = performance.now();
 
@@ -309,6 +335,9 @@ export class AnteClient {
           );
         }
         halt();
+        // The authorization parked by requestGrind covers this, so no second
+        // prompt. onPrompt stays honoured for the fallback path, where the
+        // delegate has no authorization and asks after all.
         return client.signCommit(purpose, solution.nonce, minBits, promptOpts.onPrompt);
       },
     };
@@ -316,6 +345,33 @@ export class AnteClient {
 
   /// The challenge preimage for `purpose` — for callers running their own
   /// grinder. Grind `blake3(bytes ‖ nonce_le)`, count leading zero bits.
+  /// Ask the user to authorize grinding BEFORE any of it happens.
+  ///
+  /// Returns the challenge on approval — so this replaces `challenge()` rather
+  /// than adding a round trip — or `{ denied: true }` if refused, in which case
+  /// nothing has been spent.
+  ///
+  /// Prefer this over `challenge()`. The old order asked for consent after the
+  /// grind, which meant a refusal cost the user the work they had just done,
+  /// and put the only decision they make after the only expensive part. An app
+  /// the user has chosen "always allow" for is not prompted at all.
+  ///
+  /// The delegate parks a single-use authorization scoped to this exact caller,
+  /// purpose and bar, so the `signCommit` that follows does not ask again.
+  async requestGrind(
+    purpose: string,
+    minBits: number,
+    opts: PromptOptions = {},
+  ): Promise<{ denied: true } | { denied: false; challenge: Uint8Array }> {
+    const outcome = await this.prompted(
+      { RequestGrind: { purpose, min_bits: minBits } },
+      opts.onPrompt,
+    );
+    if (outcome.denied) return { denied: true };
+    expect(outcome.variant, "GrindAuthorized");
+    return { denied: false, challenge: asBytes(mapGet(outcome.fields!, "bytes")) };
+  }
+
   async challenge(purpose: string): Promise<Uint8Array> {
     const reply = await this.oneShot({ Challenge: { purpose } });
     expect(reply.variant, "Challenge");

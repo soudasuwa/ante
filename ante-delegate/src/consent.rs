@@ -47,6 +47,17 @@ pub struct Pending {
 
 #[derive(Serialize, Deserialize)]
 enum PendingAction {
+    /// Approval sought BEFORE the work, so a refusal costs nothing. Carries no
+    /// nonce because none exists yet — that is the entire difference from
+    /// `Commit`, and the reason this variant has to exist separately.
+    Grind {
+        purpose: String,
+        min_bits: u32,
+        /// Returned on approval so the caller can start grinding immediately,
+        /// rather than making a second round trip for something the delegate
+        /// already computed to render this prompt.
+        challenge: Vec<u8>,
+    },
     Commit {
         purpose: String,
         nonce: u64,
@@ -115,6 +126,64 @@ fn raise(
                 .collect(),
         },
     )])
+}
+
+/// Emit the ask-first prompt: this app wants to spend CPU, here is how much and
+/// what for, before any of it is spent.
+///
+/// The text names the cost in time rather than in bits. "18 bits" is precise and
+/// tells a non-specialist nothing; "a second or two" is what they are actually
+/// being asked to agree to. Both are shown, because the bits are what the app
+/// and the network care about and hiding them would make the prompt disagree
+/// with everything else on screen.
+pub fn emit_grind_prompt(
+    env: &mut impl DelegateEnv,
+    origin: Option<&MessageOrigin>,
+    identity_vk: &[u8; 32],
+    purpose: &str,
+    min_bits: u32,
+) -> Result<Vec<OutboundDelegateMsg>, DelegateError> {
+    let fingerprint = ante_core::fingerprint(identity_vk);
+    let caller = caller_label(origin);
+    let challenge = ante_core::pow::challenge_bytes(purpose, identity_vk);
+    let text = format!(
+        "{caller} wants to spend some of this device's CPU, then sign the \
+         result with your ante identity {fingerprint}.\n\n\
+         Work: at least {min_bits} bits{cost}.\n\
+         For: {purpose}\n\n\
+         Nothing has been spent yet. Allow does this once. Always allow stops \
+         asking for this app until you revoke it. Your key itself is never \
+         revealed.",
+        cost = approx_cost(min_bits),
+    );
+    raise(
+        env,
+        origin,
+        PendingAction::Grind {
+            purpose: purpose.to_string(),
+            min_bits,
+            challenge,
+        },
+        text,
+        &[ALLOW, ALWAYS, DENY],
+    )
+}
+
+/// A rough wall-clock cost for a bit target, for the prompt.
+///
+/// Deliberately vague and deliberately conservative. It is calibrated on a
+/// browser doing ~2e5 hashes/second, which is the slow end; a fast machine
+/// beats it and nobody is upset by that. The alternative — quoting bits alone —
+/// asks people to consent to an exponent.
+fn approx_cost(bits: u32) -> String {
+    match bits {
+        0..=16 => " (about a second)".to_string(),
+        17..=19 => " (a few seconds)".to_string(),
+        20..=21 => " (around ten seconds)".to_string(),
+        22..=23 => " (up to a minute)".to_string(),
+        24..=25 => " (a minute or more)".to_string(),
+        _ => " (several minutes or more)".to_string(),
+    }
 }
 
 /// Emit the commit consent prompt. The caller has already confirmed the nonce
@@ -243,6 +312,28 @@ pub fn handle_response(
     let answer = resp.response.bytes();
 
     match pending.action {
+        PendingAction::Grind {
+            purpose,
+            min_bits,
+            challenge,
+        } => {
+            if answer != ALLOW && answer != ALWAYS {
+                return Ok(vec![reply(&AnteResponse::Denied)]);
+            }
+            if answer == ALWAYS {
+                grants::grant(env, &pending.origin_tag).map_err(DelegateError::Other)?;
+            } else {
+                // Park the decision so the Commit that follows does not ask a
+                // second time for the one thing already agreed to. Single-use,
+                // and scoped to this exact caller, purpose and bar.
+                crate::authz::authorize(env, &pending.origin_tag, &purpose, min_bits)
+                    .map_err(DelegateError::Other)?;
+            }
+            Ok(vec![reply(&AnteResponse::GrindAuthorized {
+                bytes: challenge,
+            })])
+        }
+
         PendingAction::Commit { purpose, nonce, ts } => {
             if answer != ALLOW && answer != ALWAYS {
                 return Ok(vec![reply(&AnteResponse::Denied)]);
@@ -273,6 +364,10 @@ pub fn handle_response(
             if replacing.is_some() {
                 grants::revoke(env, None).map_err(DelegateError::Other)?;
             }
+            // Nor do approvals to grind: they were given against the old key,
+            // and the challenge binds the key, so an approval parked for one
+            // identity could never legitimately be spent by another.
+            crate::authz::clear(env);
             Ok(vec![reply(&AnteResponse::Imported {
                 verifying_key: identity::vk_for_seed(&seed),
             })])

@@ -46,6 +46,236 @@ fn run(env: &mut TestEnv, origin: &MessageOrigin, req: AnteRequest) -> Vec<Outbo
 }
 
 // ---------------------------------------------------------------------------
+// RequestGrind — consent before the cost
+// ---------------------------------------------------------------------------
+
+/// The identity every `env()` deterministically creates.
+fn vk_of(_env: &mut TestEnv) -> [u8; 32] {
+    expected_key().verifying_key().to_bytes()
+}
+
+/// A nonce clearing `bits` for this purpose and identity.
+fn grind(purpose: &str, vk: &[u8; 32], bits: u32) -> u64 {
+    pow::grind(purpose, vk, bits).expect("reachable")
+}
+
+/// Drive a prompt to approval and return the delegate's reply.
+fn answer_prompt(
+    env: &mut TestEnv,
+    origin: &MessageOrigin,
+    out: &[OutboundDelegateMsg],
+    button: &[u8],
+) -> AnteResponse {
+    let req_id = match &out[0] {
+        OutboundDelegateMsg::RequestUserInput(r) => r.request_id,
+        other => panic!("expected a prompt, got {other:?}"),
+    };
+    let resp = UserInputResponse {
+        request_id: req_id,
+        response: ClientResponse::new(button.to_vec()),
+        context: DelegateContext::default(),
+    };
+    let out = consent::handle_response(env, Some(origin), &resp).expect("response ok");
+    decode_reply(&out)
+}
+
+#[test]
+fn request_grind_prompts_before_any_work_and_then_commit_does_not() {
+    let mut env = env();
+    let purpose = "app:post:v1";
+
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::RequestGrind {
+            purpose: purpose.into(),
+            min_bits: 8,
+        },
+    );
+    assert!(
+        matches!(out[0], OutboundDelegateMsg::RequestUserInput(_)),
+        "asking to grind must prompt before the work, not after"
+    );
+    let approved = answer_prompt(&mut env, &origin_a(), &out, b"Allow");
+    let AnteResponse::GrindAuthorized { bytes } = approved else {
+        panic!("expected GrindAuthorized, got {approved:?}");
+    };
+    assert_eq!(bytes, pow::challenge_bytes(purpose, &vk_of(&mut env)));
+
+    // The whole point: the commit that follows is not a second question.
+    let nonce = grind(purpose, &vk_of(&mut env), 8);
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::Commit {
+            purpose: purpose.into(),
+            nonce,
+            min_bits: 8,
+            ts: 1,
+        },
+    );
+    assert!(
+        matches!(decode_reply(&out), AnteResponse::Committed { .. }),
+        "an authorized commit must sign without asking again"
+    );
+}
+
+#[test]
+fn an_authorization_is_single_use() {
+    let mut env = env();
+    let purpose = "app:post:v1";
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::RequestGrind {
+            purpose: purpose.into(),
+            min_bits: 8,
+        },
+    );
+    answer_prompt(&mut env, &origin_a(), &out, b"Allow");
+
+    let nonce = grind(purpose, &vk_of(&mut env), 8);
+    let commit = |env: &mut TestEnv| {
+        run(
+            env,
+            &origin_a(),
+            AnteRequest::Commit {
+                purpose: purpose.into(),
+                nonce,
+                min_bits: 8,
+                ts: 1,
+            },
+        )
+    };
+    assert!(matches!(
+        decode_reply(&commit(&mut env)),
+        AnteResponse::Committed { .. }
+    ));
+    // Approving one grind must not authorize an unlimited number of signatures.
+    assert!(
+        matches!(
+            commit(&mut env)[0],
+            OutboundDelegateMsg::RequestUserInput(_)
+        ),
+        "a spent authorization must fall back to prompting"
+    );
+}
+
+#[test]
+fn an_authorization_does_not_cross_apps_or_raise_the_bar() {
+    let mut env = env();
+    let purpose = "app:post:v1";
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::RequestGrind {
+            purpose: purpose.into(),
+            min_bits: 8,
+        },
+    );
+    answer_prompt(&mut env, &origin_a(), &out, b"Allow");
+    let nonce = grind(purpose, &vk_of(&mut env), 8);
+
+    // Another app cannot spend what this user approved for THIS one.
+    let out_b = run(
+        &mut env,
+        &origin_b(),
+        AnteRequest::Commit {
+            purpose: purpose.into(),
+            nonce,
+            min_bits: 8,
+            ts: 1,
+        },
+    );
+    assert!(
+        matches!(out_b[0], OutboundDelegateMsg::RequestUserInput(_)),
+        "an approval is scoped to the app that asked"
+    );
+
+    // Nor can the same app quietly spend a 8-bit approval on a different bar:
+    // the number shown in the prompt has to be the number that was agreed.
+    let out_bits = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::Commit {
+            purpose: purpose.into(),
+            nonce,
+            min_bits: 4,
+            ts: 1,
+        },
+    );
+    assert!(
+        matches!(out_bits[0], OutboundDelegateMsg::RequestUserInput(_)),
+        "an approval is scoped to the bar it was given for"
+    );
+}
+
+#[test]
+fn denying_a_grind_costs_nothing_and_parks_nothing() {
+    let mut env = env();
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::RequestGrind {
+            purpose: "app:post:v1".into(),
+            min_bits: 8,
+        },
+    );
+    let denied = answer_prompt(&mut env, &origin_a(), &out, b"Deny");
+    assert_eq!(denied, AnteResponse::Denied);
+    assert!(
+        env.context_is_empty(),
+        "a refusal must clear the pending prompt"
+    );
+
+    let nonce = grind("app:post:v1", &vk_of(&mut env), 8);
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::Commit {
+            purpose: "app:post:v1".into(),
+            nonce,
+            min_bits: 8,
+            ts: 1,
+        },
+    );
+    assert!(
+        matches!(out[0], OutboundDelegateMsg::RequestUserInput(_)),
+        "a denied grind must leave no authorization behind"
+    );
+}
+
+#[test]
+fn always_allow_skips_the_grind_prompt_entirely() {
+    let mut env = env();
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::RequestGrind {
+            purpose: "app:post:v1".into(),
+            min_bits: 8,
+        },
+    );
+    answer_prompt(&mut env, &origin_a(), &out, b"Always allow");
+
+    // This is what makes asking-first bearable rather than a popup per action,
+    // and it is the answer to the obvious objection against requiring consent
+    // for CPU at all.
+    let out = run(
+        &mut env,
+        &origin_a(),
+        AnteRequest::RequestGrind {
+            purpose: "app:other:v1".into(),
+            min_bits: 12,
+        },
+    );
+    assert!(
+        matches!(decode_reply(&out), AnteResponse::GrindAuthorized { .. }),
+        "a trusted app must not be asked again"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // HasIdentity — the probe that must not write
 // ---------------------------------------------------------------------------
 

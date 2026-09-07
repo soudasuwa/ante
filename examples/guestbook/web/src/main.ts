@@ -290,19 +290,37 @@ async function startGrinding() {
   const gen = ++generation;
   setComposeState("grinding");
   renderGrind(null, 0, 0);
+  const progress = $("progress");
   try {
-    const started = await startPostGrind(ante, input.name, input.text, (p) => {
-      if (gen !== generation) return; // stale worker, ignore
-      renderGrind(p.best?.bits ?? null, p.elapsed, p.tried);
-    });
+    const started = await startPostGrind(
+      ante,
+      input.name,
+      input.text,
+      (p) => {
+        if (gen !== generation) return; // stale worker, ignore
+        renderGrind(p.best?.bits ?? null, p.elapsed, p.tried);
+      },
+      () => {
+        // The node is asking before anything is spent, so say that rather than
+        // letting the panel claim work is happening when none has started.
+        progress.hidden = false;
+        progress.textContent = "approve on your node to begin — nothing is spent yet";
+      },
+    );
+    progress.hidden = true;
     if (gen !== generation) {
       started.stop(); // cancelled while the challenge was in flight
       return;
     }
     session = started;
   } catch (err) {
-    $("progress").hidden = false;
-    $("progress").textContent = `failed: ${(err as Error).message}`;
+    progress.hidden = false;
+    // Declining is not a failure. It is the feature working, and it should not
+    // be rendered in the same words as a broken node.
+    progress.textContent =
+      (err as Error).name === "GrindDeniedError"
+        ? "you declined — nothing was spent"
+        : `failed: ${(err as Error).message}`;
     cancelGrinding();
   }
 }

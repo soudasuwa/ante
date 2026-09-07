@@ -16,6 +16,28 @@ It is the step between *no effort at all to sybil* and *needs a ghost key*. A
 proof shows a key cost something. It does **not** show the key is unique,
 human-held, or not one of many an attacker made — see `DESIGN.md`.
 
+### Consent comes before the cost
+
+An app asks `RequestGrind { purpose, min_bits }` and the node prompts *before*
+any work happens: "<app> wants to spend some of this device's CPU, at least 18
+bits (a few seconds), for <purpose>. Nothing spent yet." Approving parks a
+single-use authorization, so the `Commit` that follows does not ask again.
+
+The delegate still does not grind — it is a single-threaded message loop, and a
+minute of hashing inside it would block the node's contract executor. Only the
+decision moved. What that buys: refusing is free, the choice arrives before the
+expense rather than after it, and the prompt can describe a cost in seconds
+instead of asking about one already sunk.
+
+Scoped to `(origin_tag, purpose, min_bits)` and consumed on use. One app cannot
+spend another's approval, an approval for one message cannot sign a different
+one, and the bar shown in the prompt is the bar it authorises. Single-use rather
+than expiring because the delegate has no clock — `ts` is caller-supplied, so any
+expiry would be a number the caller chooses.
+
+`Commit` still prompts on its own when nothing was authorised, so an app that
+never calls `RequestGrind` keeps working.
+
 ### Everything starts empty
 
 Both contracts were reset at launch, to `ante-guestbook:post:v2` and
