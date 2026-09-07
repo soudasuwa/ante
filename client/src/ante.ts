@@ -157,10 +157,12 @@ export class AnteClient {
   /// a secret namespace keyed by it — so changing the delegate leaves the old
   /// identity intact but unreachable from the new one. This finds it.
   ///
-  /// Costs no prompt: `GetIdentity` never raises one. It does *create* an
-  /// identity in a previous generation that is registered but empty, which is
-  /// harmless — that generation is already retired — but it is why this is
-  /// worth calling only when the user asks.
+  /// Costs no prompt, and — since `HasIdentity` — no write either, which is
+  /// what makes it safe to run automatically on load.
+  ///
+  /// Results are deduplicated by identity: several generations can hold the
+  /// same key once it has been adopted forward, and the user is choosing an
+  /// identity, not a generation.
   async findStrandedIdentities(previous: readonly PreviousDelegate[]): Promise<StrandedSearch> {
     const current = await this.identity();
     const search: StrandedSearch = { found: [], unresponsive: [] };
@@ -193,7 +195,16 @@ export class AnteClient {
           continue;
         }
         const vk = asBytes(mapGet(parsed.fields!, "verifying_key"));
-        if (!bytesEqual(vk, current)) search.found.push({ delegate: gen, verifyingKey: vk });
+        if (bytesEqual(vk, current)) continue;
+        // One identity, not one row per generation that happens to hold it.
+        // Adopting an identity forward leaves it in BOTH the old generation and
+        // the one it moved into, so after two re-keys the same key is genuinely
+        // present in several — and the user was offered a list of identical
+        // fingerprints with no way to choose between them, when every choice
+        // led to the same place. `previous` is newest-first, so the first
+        // sighting is the most recent generation holding it.
+        if (search.found.some((f) => bytesEqual(f.verifyingKey, vk))) continue;
+        search.found.push({ delegate: gen, verifyingKey: vk });
       } catch {
         search.unresponsive.push(gen);
       }

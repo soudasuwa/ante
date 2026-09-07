@@ -57,6 +57,27 @@ GUESTBOOK_WASM="$REPO_ROOT/examples/guestbook/contract/target/wasm32-unknown-unk
 # overwrite them with different ones. Set when the WASM is already in place.
 SKIP_BUILD="${ANTE_SKIP_BUILD:-}"
 
+# The record is produced by the fixed-path container build, and a host build
+# cannot reproduce it: cargo hashes a path dependency's absolute path into
+# -C metadata and no --remap-path-prefix reaches that. Comparing host bytes
+# against it would be meaningless — and worse than meaningless, because cargo
+# no-ops when its fingerprints are fresh, so a stale or hand-placed artifact can
+# make the comparison PASS. That is exactly how the published keys once came to
+# be ones no clean build reproduced.
+#
+# So when the record is container-canonical, verify it the only way that means
+# anything. ANTE_SKIP_BUILD is the publish path, where the container's artifacts
+# are already in place and re-entering would be circular.
+if [ -z "$SKIP_BUILD" ] && grep -q '^canonical = "container"' "$REPO_ROOT/artifact-keys.toml" 2>/dev/null; then
+  if command -v docker >/dev/null 2>&1; then
+    exec "$REPO_ROOT/scripts/build-in-container.sh" --check
+  fi
+  echo "artifact-keys.toml records a container build and docker is not available." >&2
+  echo "A host build cannot reproduce these keys — install docker, or run" >&2
+  echo "./scripts/build-in-container.sh --check elsewhere. Not comparing." >&2
+  exit 1
+fi
+
 STAMP="$REPO_ROOT/.artifact-build-stamp"
 TOOLCHAIN_ID="$(rustc -vV | tr '\n' ' ')|$(rustc --print sysroot)"
 if [ -z "$SKIP_BUILD" ] && { [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$TOOLCHAIN_ID" ]; }; then

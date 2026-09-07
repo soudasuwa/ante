@@ -6,9 +6,10 @@
 # different state and retry forever. `fdev verify-merge` runs the same checker
 # the network runs, so a finding here means exactly what it would mean live.
 #
-# Not in CI: it needs fdev, which CI does not install. Run it before publishing
-# a contract change. The in-crate merge-law tests (ante-core::registry) cover
-# the same properties on every commit; this checks the compiled WASM.
+# Runs in CI (the `merge-laws` job installs fdev). Kept runnable by hand too,
+# because a finding is much easier to read locally. The in-crate merge-law tests
+# (ante-core::registry) cover the same properties on the Rust types; this checks
+# the compiled WASM with the verifier the network itself uses.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
