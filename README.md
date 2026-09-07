@@ -99,6 +99,20 @@ That builds at a fixed path in a container and compares against
 path dependency's absolute path into `-C metadata`), which is exactly why the
 container exists. CI runs the same check on every push.
 
+## The documents
+
+Everything here is meant to be read by someone who was not in the room. Each one
+has a different job:
+
+| | |
+|---|---|
+| **[WHITEPAPER.md](WHITEPAPER.md)** | The complete account: why proof of commitment, every design decision and its reasoning, exact wire formats, the threat model, the failure modes we hit and what we would do next. Written to be enough to **rebuild the system from scratch** if this repository vanished. Long, and the length is the point. |
+| **[FREENET-NOTES.md](FREENET-NOTES.md)** | Platform facts that cost us days and are not in Freenet's documentation — consent, reproducible builds, silent failure modes. **Useful even if you never touch ante.** Read it before building anything on Freenet. |
+| **[DESIGN.md](DESIGN.md)** | What a proof does and does not prove, and where ante sits relative to ghost keys and reputation. Read this before assuming it protects something it does not. |
+| **[DEPLOYMENTS.md](DEPLOYMENTS.md)** | What is live: the three app URLs, the published contract instances, the delegate key record, and the lineage of everything they replaced. |
+| **[CHANGELOG.md](CHANGELOG.md)** | What shipped, and — at equal length — the limits that did not get solved. |
+| **[SECURITY.md](SECURITY.md)** | How to report a vulnerability privately. |
+
 ## Layout
 
 ```
@@ -212,6 +226,29 @@ MIT/Apache-2.0 — fork it, lift whatever is useful, no need to ask.
 If you find a security problem in something still running, please use
 [private reporting](SECURITY.md) rather than a public issue.
 
+## Credits
+
+Built by **Alessandro Delass** with **Claude Opus 5** (Anthropic), September 2026.
+
+The honest division of labour, since the question is usually left vague: Claude
+wrote most of the code, the tests and the prose here. The direction and every
+design decision were human, and so were a good share of the findings that
+mattered — the "25 bits instantly" report that exposed proofs not being bound to
+their message, the insistence on fixing the cause rather than the symptom when
+identities were being stranded, the observation that consent belongs *before* the
+cost rather than after it, and the argument that *commitment* is a better name
+than *work* for what this measures.
+
+Every commit is co-authored, so `git log` shows the same story in more detail.
+
+Small project, and a step in a direction worth taking: an AI and a person
+building something neither would have finished alone, with the reasoning written
+down rather than lost.
+
 ## License
 
-MIT OR Apache-2.0.
+MIT OR Apache-2.0 — dual licensing, which is the Rust ecosystem's convention.
+"OR" means **you choose either one**; you are not bound by both. MIT is short and
+permissive; Apache-2.0 adds an explicit patent grant and is preferred by some
+organisations. Both require you to keep the copyright notice, which is the
+attribution ante asks for in return.
