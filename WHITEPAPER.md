@@ -982,9 +982,25 @@ Roughly in priority order.
 
    The honest gap: a generation this node never registered is indistinguishable
    from a broken one. Both are silence, and silence is not absence, so the UI
-   says so rather than reporting "nothing found". Still worth doing later:
-   running it automatically when it can be done without prompting, which needs
-   a `HasIdentity` request the delegate does not have.
+   says so rather than reporting "nothing found".
+
+   **Automatic detection — done (2026-09-07).** It needed a `HasIdentity`
+   request, and the reason is worth keeping: `GetIdentity` *creates on miss*, so
+   probing an older generation with it mints an identity inside the generation
+   being probed and then reports that fresh key back as a stranded identity it
+   "found" — a search fabricating its own result, and writing to the secret
+   store as a side effect of a read. `HasIdentity` answers `Identity` or
+   `NoIdentity` without creating, which makes the probe safe to run unattended.
+   Generations published before it exists reject it as malformed, so the prober
+   falls back to `GetIdentity` for them; create-on-probe is confined to WASM
+   that can no longer be changed.
+
+   `NoIdentity` also buys a *definite absence*, distinct from silence — the
+   difference between "nothing is here" and "nobody answered", which is what the
+   UI needed to stop hedging.
+
+   Adopting is still a click and still raises both prompts. Only the looking is
+   automatic, and only a genuine find is ever mentioned.
 2. **Bucketed registry summaries** (§10.2), before the registry exceeds a few
    thousand identities. Batch with any other wire change.
 3. **Freshness.** `ts` is unauthenticated and always will be. If apps start
@@ -1058,10 +1074,34 @@ Roughly in priority order.
    anyone's memory.
 
 8. **A fixed-path (containerised) build**, so a third party can rebuild the
-   delegate and confirm the published key. Today the build is only same-path
-   reproducible (§12.1), which catches accidental re-keys but does not let
-   anyone verify the shipped bytes independently. A `Dockerfile` with a fixed
-   `WORKDIR` is the whole fix.
+   delegate and confirm the published key. A `Dockerfile` with a fixed
+   `WORKDIR` is the remaining fix; cargo's `-C metadata` hashes a path
+   dependency's absolute path, so the build is still only same-path
+   reproducible.
+
+   **Half of this was not a missing feature but a live defect, fixed
+   2026-09-07.** `--remap-path-prefix=$RUSTUP_HOME=/rustup` preserves the
+   toolchain's *installation directory name*, so std's own source paths came
+   through as `/rustup/toolchains/stable-x86_64-…/…` on one machine and
+   `…/1.98.1-x86_64-…/…` on another. The same compiler — same version, same
+   commit, installed twice under two names — produced 36 differing bytes across
+   6 std paths, which is a different delegate key and different contract
+   addresses. `rust-toolchain.toml` pins the version but not the name it is
+   installed under, and `stable` resolving to the pinned version is the ordinary
+   case on a developer machine, so this was reachable by anyone.
+
+   Two lessons generalise. **rustc applies the LAST matching
+   `--remap-path-prefix`, not the first**, so a narrow rule must come after a
+   broad one or it silently does nothing. And **cargo's fingerprint does not
+   include the toolchain's installation path** — only source and flags — so an
+   artifact cached under one toolchain is reused under another and a key guard
+   reports green on bytes the current environment would never produce. That is
+   how the published keys came to be ones no clean build reproduced while every
+   check in between passed in under a second. `check-keys.sh` now makes the
+   toolchain identity part of its cache key.
+
+   The cost was a full re-key of all three artifacts, since the published bytes
+   had been built in an environment nothing could reproduce.
 9. **`fdev verify-merge` in CI.** It runs today via `scripts/verify-merge.sh`
    and passes cleanly, but CI does not install `fdev`, so it is a pre-publish
    step rather than a per-commit gate.
