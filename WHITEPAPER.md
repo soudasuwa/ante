@@ -253,6 +253,48 @@ non-canonical signature encodings, closing the malleability classes that make
 `MAX_PURPOSE_BYTES = 256` exists to stop a hostile caller putting a megabyte of
 text into a consent prompt or a stored proof.
 
+### 4.5 What a proof does *not* bind — the sharpest footgun
+
+A proof commits to `(identity_vk, purpose, nonce, ts)`. **That is the complete
+list.** In particular it says nothing about the action it was minted for, and
+this is the mistake we actually shipped.
+
+The guestbook originally used one fixed `purpose` for every post. Three
+consequences, none obvious in isolation and jointly fatal:
+
+1. The challenge is `blake3(CONTEXT ‖ purpose ‖ vk)` — identical for every post
+   by that author.
+2. Grinding starts at nonce 0, so the *same search* runs every time. An author
+   whose sequence happens to contain a high-bit nonce early re-finds it
+   instantly, forever, for free. This is deterministic per identity: some
+   authors are permanently lucky, others permanently unlucky.
+3. Nothing tied the proof to the text, so that single proof validated an
+   unlimited number of *different* messages.
+
+It was never per-post proof of work. It was a one-time toll, and for a lucky
+identity not even that. It surfaced as a user reporting "25 bits instantly" —
+a number that was entirely real, and whose realness was the bug.
+
+**The fix, and the general rule.** Fold whatever the proof must not be
+transferable across into the purpose string:
+
+```
+purpose = "myapp:post:v1" ‖ ":" ‖ hex(blake3(len(name) ‖ name ‖ len(text) ‖ text)[..8])
+```
+
+with each variable-length field length-prefixed, for the same reason the
+challenge layout prefixes `purpose` (§4.1). Every distinct message becomes its
+own challenge and requires its own search.
+
+This is the same mechanism §3 prescribes for freshness (`myapp:comment:2026-W12`).
+The purpose string is the *only* place an application can express what a proof
+is for, so the design question for any consumer is: **what could an attacker
+re-use this proof for, and is that in the purpose?**
+
+A per-identity *level* is the deliberate exception — `ante:identity-level:v1` is
+fixed precisely because re-grinding it should re-find the same proof. You are
+claiming a standing property, not paying for an action.
+
 ---
 
 ## 5. Architecture on Freenet
@@ -843,7 +885,8 @@ would strand every secret. Send something stable.
 | Claim someone else's proof | the signature proves possession of the private key |
 | Overstate the work done | bits are recomputed from the nonce, never stored |
 | Tamper with nonce / ts / purpose | all covered by the signature |
-| Replay one signed entry many times | app-level: the guestbook keys entries by `blake3(vk ‖ nonce ‖ text)`, so replays collapse |
+| Replay one signed entry verbatim | app-level: the guestbook keys entries by `blake3(vk ‖ nonce ‖ text)`, so replays collapse to one |
+| **Reuse one proof for a different message** | app-level, and easy to get wrong — see §4.5. The proof binds `(identity, purpose, nonce)` and nothing else, so the app must fold the message into `purpose` |
 | Answer someone else's consent prompt | the answering origin must match the parked, runtime-attested origin tag |
 | Knock down a pending prompt with a guessed id | id mismatch errors *without* clearing the parked state |
 | Get a proof without the user noticing | every first spend per app prompts; grants are explicit, listed and revocable |
