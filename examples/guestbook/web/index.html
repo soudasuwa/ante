@@ -10,8 +10,9 @@
       <header>
         <h1>ante guestbook</h1>
         <p class="sub">
-          Every post carries a proof of work. Entries are grouped by how much
-          the author committed.
+          Anyone can sign — no account needed. Each post carries a little
+          computing time as proof, and entries are grouped by how much their
+          author spent.
         </p>
         <p id="status" class="status">connecting…</p>
       </header>
@@ -26,9 +27,11 @@
           <textarea id="text" rows="3" maxlength="500" placeholder="say hello"></textarea>
         </label>
         <p id="start-hint" class="muted">
-          Posting costs proof of work. Your browser searches for it — one CPU
-          core, for as long as you let it run. Nothing is signed or posted until
-          you press Post, and you can stop at any time.
+          Your <strong>Ante key</strong> is an identity your own Freenet node
+          holds for you — no signup, no email, nothing to remember. Posting
+          spends a little computing time with it, as proof you are not a spam
+          script. You choose how much: the longer it runs, the higher your
+          message sits. Nothing is posted until you confirm.
         </p>
 
         <div id="grind-panel" hidden>
@@ -38,14 +41,14 @@
             <span id="grind-elapsed" class="muted"></span>
           </div>
           <p class="muted">
-            Searching. The longer you let it run, the higher your message sits —
-            each extra bit takes twice as long as the last. When you press Post,
-            your node will ask you to sign the proof found so far.
+            Working. Each extra bit takes about twice as long as the last, so
+            this climbs quickly then slows down — stop whenever you are happy.
+            Your node will ask you to confirm before anything is posted.
           </p>
         </div>
 
         <div class="actions">
-          <button id="start">Start working</button>
+          <button id="start">Sign with Ante key</button>
           <button id="post" hidden disabled>Post</button>
           <button id="cancel" class="ghost" hidden>Stop</button>
         </div>
