@@ -52,8 +52,8 @@ WebSocket API; there is nothing to render.
 
 | Contract | Instance | Parameters | Publish |
 |---|---|---|---|
-| ante-registry | `67bb1FuQfrsZnWLvGVDswwta2HMxtUEDQa93y3QasJKz` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
-| guestbook example | `FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
+| ante-registry | `8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
+| guestbook example | `Hs8VUxPnm6d62BU58489mEZ9tngNzEUdqBBTkmaLDBp` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
 
 The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`FFAmy…`).
 Two different ids for one example — that is the normal shape of a Freenet app,
@@ -66,7 +66,7 @@ the existing instance without republishing:
 
 ```bash
 ./scripts/gen-embedded.sh ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm \
-  67bb1FuQfrsZnWLvGVDswwta2HMxtUEDQa93y3QasJKz
+  8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU
 ```
 
 ## Who can move a pointer
@@ -112,4 +112,6 @@ Kept so a stale id can be recognised rather than puzzled over.
 | ante-registry | `GFFaptbqcNprDPCkpQmRnLQLdeeXv6kDVSoiM5B6YThK` | doc-comment edits in `ante-core::registry` shifted the compiled bytes |
 | guestbook | `Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9` | proofs were not bound to the message, so one grind bought unlimited posts (see the guestbook README) |
 | ante-registry | `E8jXsQgvKkn1kzEpSDFwDRUbqZW3Tc1Z7BtmXQwyfb1J` | build made reproducible across machines: pinned rustc + the worktree path remap |
+| ante-registry | `67bb1FuQfrsZnWLvGVDswwta2HMxtUEDQa93y3QasJKz` | empty delta to a converged peer (`fdev verify-merge`) |
+| guestbook | `FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw` | same |
 | guestbook | `3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL` | same |

@@ -203,6 +203,9 @@ impl ContractInterface for Contract {
                     }
                     current.merge(incoming);
                 }
+                // An empty delta is the "you are already converged" answer from
+                // get_state_delta. It carries no CBOR at all, so decode nothing.
+                UpdateData::Delta(bytes) if bytes.as_ref().is_empty() => {}
                 UpdateData::Delta(bytes) => {
                     let delta: GuestbookDelta = from_cbor(bytes.as_ref()).map_err(reject)?;
                     for entry in delta.entries {
@@ -252,14 +255,21 @@ impl ContractInterface for Contract {
             from_cbor(summary.as_ref()).map_err(ContractError::Deser)?
         };
         let have: std::collections::BTreeSet<[u8; 32]> = have.keys.into_iter().collect();
-        let delta = GuestbookDelta {
-            entries: state
-                .entries
-                .into_iter()
-                .filter(|(k, _)| !have.contains(k))
-                .map(|(_, entry)| entry)
-                .collect(),
-        };
-        Ok(StateDelta::from(cbor(&delta)))
+        let entries: Vec<Entry> = state
+            .entries
+            .into_iter()
+            .filter(|(k, _)| !have.contains(k))
+            .map(|(_, entry)| entry)
+            .collect();
+
+        // A peer that already has everything gets literally nothing back — the
+        // unambiguous "converged" answer. Serialising an empty GuestbookDelta
+        // instead would ship ~10 bytes of CBOR framing on every anti-entropy
+        // heartbeat forever, which `fdev verify-merge` flags as
+        // `self_delta_empty`.
+        if entries.is_empty() {
+            return Ok(StateDelta::from(Vec::new()));
+        }
+        Ok(StateDelta::from(cbor(&GuestbookDelta { entries })))
     }
 }

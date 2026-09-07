@@ -207,6 +207,39 @@ fn pinned_delta() -> GuestbookDelta {
     }
 }
 
+/// `fdev verify-merge` flags a non-empty delta to a converged peer
+/// (`self_delta_empty`): it would ship CBOR framing on every anti-entropy
+/// heartbeat forever. And the apply side must accept the empty bytes it emits.
+#[test]
+fn a_converged_peer_gets_literally_nothing_and_can_apply_it() {
+    let state = apply(&[], vec![entry(&author(40), "z", "hi", PURPOSE, MIN_BITS)]).unwrap();
+    let summary = Contract::summarize_state(params_bytes(), State::from(state.clone()))
+        .unwrap()
+        .into_bytes();
+    let delta = Contract::get_state_delta(
+        params_bytes(),
+        State::from(state.clone()),
+        StateSummary::from(summary),
+    )
+    .unwrap()
+    .into_bytes();
+    assert!(
+        delta.is_empty(),
+        "converged peers exchange no bytes, got {delta:?}"
+    );
+
+    // Applying it must be a no-op, not a decode error.
+    let after = Contract::update_state(
+        params_bytes(),
+        State::from(state.clone()),
+        vec![UpdateData::Delta(StateDelta::from(delta))],
+    )
+    .expect("an empty delta applies cleanly")
+    .new_state
+    .expect("state");
+    assert_eq!(entries(&after).entries.len(), entries(&state).entries.len());
+}
+
 #[test]
 fn get_state_delta_returns_only_entries_the_peer_lacks() {
     let s1 = apply(&[], vec![entry(&author(13), "a", "one", PURPOSE, MIN_BITS)]).unwrap();

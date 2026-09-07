@@ -79,6 +79,9 @@ impl ContractInterface for Contract {
                     // registry, some of which we may already beat).
                     current.merge(&params, &incoming);
                 }
+                // An empty delta means the peer is already converged; nothing
+                // to decode. See get_state_delta.
+                UpdateData::Delta(bytes) if bytes.as_ref().is_empty() => {}
                 UpdateData::Delta(bytes) => {
                     let delta: RegistryDelta = from_cbor(bytes.as_ref()).map_err(reject)?;
                     // A delta is a deliberate submission — reject the whole
@@ -127,6 +130,14 @@ impl ContractInterface for Contract {
         } else {
             from_cbor(summary.as_ref()).map_err(ContractError::Deser)?
         };
-        Ok(StateDelta::from(cbor(&state.delta_since(&summary))))
+        let delta = state.delta_since(&summary);
+        // Nothing to send: return literally nothing rather than CBOR framing
+        // around an empty list. `fdev verify-merge` flags the latter as
+        // `self_delta_empty`, and it would cost the network bytes on every
+        // heartbeat between converged peers.
+        if delta.proofs.is_empty() {
+            return Ok(StateDelta::from(Vec::new()));
+        }
+        Ok(StateDelta::from(cbor(&delta)))
     }
 }

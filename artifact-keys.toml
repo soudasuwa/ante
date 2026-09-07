@@ -15,5 +15,5 @@ code_hash = "3b831048a0dd20f8efa5793cecad59f949f2c68a3fea81ffa958613d7436efcb"
 key = "84b825053c1560bcdc7a7a1a3e08096e8b5d231f0af3a30e887ca1f18adf0411"
 
 [contracts]
-ante_registry_code_hash = "73f4d5de0ca0448ecd14f80c538ef88b4d715bcafb0739cbd55a3c9ab01198e9"
-guestbook_code_hash = "bf660dcd493d1d86eb34b410bbcc511b9535cae5dc3829a9e284a5ae6914950c"
+ante_registry_code_hash = "dd15a03d6ffe2dd8638a2b2cd448b55beb2492f9f4d91b97f7de2ed6205b3425"
+guestbook_code_hash = "4668bb50ebb100352a4914eecbabe0725b38d86a994af5169c65bdf4ad376095"

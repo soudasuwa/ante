@@ -81,7 +81,7 @@ rustup target add wasm32-unknown-unknown # once
 
 npm install                              # workspaces: client + web
 npm test                                 # cross-impl guard (TS verifier vs a Rust vector)
-npm run dev --workspace web              # the UI, against your local node
+npm run dev --workspace ante-vault-web              # the UI, against your local node
 ```
 
 `npm run dev` serves on its own origin, so pass your node with a query param:
@@ -105,7 +105,7 @@ Optional — the UI works without it, showing only the local best level.
 ```bash
 # fdev: install from https://freenet.org/install.sh  (cargo install fdev needs rustc >= 1.94)
 ./scripts/publish-registry.sh            # build, publish, write the id into client/src/embedded.ts
-npm run build --workspace web            # or restart `npm run dev` to pick up the id
+npm run build --workspace ante-vault-web            # or restart `npm run dev` to pick up the id
 ```
 
 Once configured, the "Strengthen your identity" panel publishes each proof to

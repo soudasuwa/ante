@@ -149,3 +149,28 @@ fn summary_and_delta_round_trip_through_the_contract() {
     }
     assert!(fresh.level(&vk(10)).is_some());
 }
+
+/// `fdev verify-merge` flags a non-empty delta to a converged peer
+/// (`self_delta_empty`), and the apply side must accept the empty bytes.
+#[test]
+fn a_converged_peer_gets_literally_nothing_and_can_apply_it() {
+    let state = submit(&[], vec![proof(41, PURPOSE, 13)]).expect("accepted");
+    let summary = Contract::summarize_state(params_bytes(), State::from(state.clone()))
+        .unwrap()
+        .into_bytes();
+    let delta = Contract::get_state_delta(
+        params_bytes(),
+        State::from(state.clone()),
+        StateSummary::from(summary),
+    )
+    .unwrap()
+    .into_bytes();
+    assert!(delta.is_empty(), "converged peers exchange no bytes");
+
+    Contract::update_state(
+        params_bytes(),
+        State::from(state),
+        vec![UpdateData::Delta(StateDelta::from(delta))],
+    )
+    .expect("an empty delta applies cleanly");
+}

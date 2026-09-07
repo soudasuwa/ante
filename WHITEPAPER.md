@@ -628,6 +628,18 @@ Six tests pin the laws directly: `merge(A,A) == A`, a delta applied twice,
 associativity over three states, order-independent tie-breaking, and an empty
 delta to a converged peer.
 
+Beyond the tests, both contracts are checked with `fdev verify-merge`, which
+runs the same verifier the network runs against the compiled WASM
+(`scripts/verify-merge.sh`). Current result: **86 cases, 86 held, zero
+violations** for each — enforceable and diagnostic alike. Its one earlier
+finding is worth recording, because it is the kind of thing tests do not catch:
+`get_state_delta` returned ~10 bytes of CBOR framing to an already-converged
+peer instead of nothing. Harmless per exchange, but it ships on every
+anti-entropy heartbeat between every pair of converged peers, forever. Both
+contracts now return a literally empty `StateDelta`, and both accept one on the
+apply side — which is the half that is easy to forget, since an empty buffer is
+not valid CBOR.
+
 ### 10.2 A known scaling limit, stated plainly
 
 `RegistrySummary` is **linear in the number of registered identities**, and a
@@ -975,8 +987,9 @@ Roughly in priority order.
    reproducible (§12.1), which catches accidental re-keys but does not let
    anyone verify the shipped bytes independently. A `Dockerfile` with a fixed
    `WORKDIR` is the whole fix.
-8. **`fdev verify-merge` in CI** against real state corpora, complementing the
-   in-crate merge-law tests.
+8. **`fdev verify-merge` in CI.** It runs today via `scripts/verify-merge.sh`
+   and passes cleanly, but CI does not install `fdev`, so it is a pre-publish
+   step rather than a per-commit gate.
 9. **Memory-hard puzzles** — see item 6 above; kept separate because it changes
    the primitive rather than the packaging.
 

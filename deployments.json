@@ -19,12 +19,12 @@
   },
   "contracts": {
     "registry": {
-      "instance": "67bb1FuQfrsZnWLvGVDswwta2HMxtUEDQa93y3QasJKz",
+      "instance": "8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU",
       "purpose": "ante:identity-level:v1",
       "minBits": 12
     },
     "guestbook": {
-      "instance": "FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw",
+      "instance": "Hs8VUxPnm6d62BU58489mEZ9tngNzEUdqBBTkmaLDBp",
       "purpose": "ante-guestbook:post:v1",
       "minBits": 16
     }
