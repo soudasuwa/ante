@@ -1008,6 +1008,16 @@ Roughly in priority order.
 
    Crucially the probe is client-side, so adopting it **re-keys nothing**.
 
+   **Built for the registry** (`client/src/migrate.ts`, swept by the vault on
+   every load). It sweeps *all* generations rather than stopping at the newest
+   that answers — the registry is a monotonic union, so more proofs is strictly
+   better and cannot undo anything. That is the crate's `FoldAll`, whose warning
+   about resurrecting delete-by-absence data does not apply because nothing is
+   ever deleted from this state. Recovered proofs go in through the ordinary
+   delta path, so `admit` re-validates each one and the sweep is permissionless.
+
+   Still open: the guestbook's entries want the identical treatment.
+
    The half that cannot wait, and is done: the **lineage**. Every superseded
    generation is recorded automatically — code hashes into `artifact-keys.toml`
    by `check-keys.sh` on an accepted re-key, instance ids into

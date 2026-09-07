@@ -58,8 +58,38 @@ async function boot() {
     setConn(registry ? "ready" : "ready — no registry configured, level not tracked", "ok");
     await refreshLevel();
     void refreshGrants();
+    void sweepPredecessors();
   } catch (err) {
     setConn(`could not reach the delegate: ${(err as Error).message}`, "err");
+  }
+}
+
+/// Bring levels forward from registry generations stranded by a re-key.
+///
+/// Runs on every load, not once: a predecessor that never answered is recorded
+/// unresolved rather than empty, so the sweep has to be repeatable. Only when
+/// every generation has actually answered is there nothing left to look for.
+async function sweepPredecessors() {
+  const previous = deployments.contracts.registry.superseded;
+  if (!registry || previous.length === 0) return;
+
+  const status = $("sweep-status");
+  status.hidden = false;
+  status.textContent = `checking ${previous.length} earlier registr${previous.length === 1 ? "y" : "ies"} for levels…`;
+  try {
+    const r = await registry.carryForward(previous, deployments.contracts.registry.minBits);
+    if (r.carried > 0) {
+      status.textContent = `recovered ${r.carried} level${r.carried === 1 ? "" : "s"} from an earlier registry`;
+      await refreshLevel();
+    } else if (!r.complete) {
+      // Deliberately not "nothing to recover": a predecessor that did not
+      // answer is not a predecessor that is empty.
+      status.textContent = `${r.unresolved.length} earlier registr${r.unresolved.length === 1 ? "y" : "ies"} did not answer — will retry next time`;
+    } else {
+      status.hidden = true;
+    }
+  } catch {
+    status.hidden = true; // never let a background sweep break the page
   }
 }
 

@@ -7,6 +7,8 @@ import { asBytes, cborDecode, cborEncode, mapGet } from "./cbor";
 import { ANTE_REGISTRY_CONTRACT_ID } from "./embedded";
 import { contractKeyFromId, FreenetClient } from "./freenet";
 import { bytesEqual } from "./util";
+import { migrateRegistry, type MigrationReport } from "./migrate";
+import { anteProofToCborValue } from "./ante-proof";
 
 export { ANTE_REGISTRY_CONTRACT_ID } from "./embedded";
 
@@ -38,6 +40,28 @@ export class RegistryClient {
       }
     }
     return null;
+  }
+
+  /// Carry levels forward from registry generations stranded by a re-key.
+  ///
+  /// Safe for anyone to run, for anyone's proofs: every one is re-validated by
+  /// the contract's own `admit` on the way in. See `migrate.ts` for the probe
+  /// rules — in particular that a predecessor which times out is unresolved
+  /// rather than empty, so `complete: false` means "run me again later".
+  async carryForward(
+    predecessors: readonly string[],
+    minBitsFloor: number,
+  ): Promise<MigrationReport> {
+    return migrateRegistry(
+      this.client,
+      ANTE_REGISTRY_CONTRACT_ID,
+      predecessors,
+      minBitsFloor,
+      async (proofs) => {
+        const delta = cborEncode({ proofs: proofs.map(anteProofToCborValue) });
+        await this.client.updateContractDelta(this.key, delta);
+      },
+    );
   }
 
   /// Publish a proof — one ground for `IDENTITY_LEVEL_PURPOSE`, straight from
