@@ -63,6 +63,37 @@ REGISTRY_CODE_HASH="$(cargo run -q --manifest-path "$REPO_ROOT/Cargo.toml" -p de
 GUESTBOOK_CODE_HASH="$(cargo run -q --manifest-path "$REPO_ROOT/Cargo.toml" -p delegate-key -- "$GUESTBOOK_WASM" | awk '$1=="code_hash_hex"{print $2}')"
 
 if [ "${ANTE_ACCEPT_REKEY:-}" = "1" ]; then
+  # Append the OUTGOING generation to the lineage before overwriting it. This
+  # is the whole point: a predecessor list has to accumulate as a side effect
+  # of the ritual, not depend on someone remembering to write it down. Without
+  # it, a future migration would have to reconstruct old hashes from git
+  # archaeology against builds that are only same-path reproducible.
+  #
+  # Shaped to feed freenet-migrate-build's legacy.toml when the probe lands.
+  LINEAGE=""
+  if [ -f "$RECORD" ]; then
+    LINEAGE="$(python3 - "$RECORD" "$DELEGATE_KEY" "$REGISTRY_CODE_HASH" "$GUESTBOOK_CODE_HASH" <<'PYEOF'
+import re, sys, datetime
+path, new_del, new_reg, new_gb = sys.argv[1:5]
+text = open(path).read()
+def field(name):
+    m = re.search(rf'^{name} *= *"([0-9a-f]+)"', text, re.M)
+    return m.group(1) if m else None
+kept = text.split("# --- lineage")[1] if "# --- lineage" in text else ""
+kept = kept.split("\n", 1)[1] if kept.startswith(" ---") or kept.startswith("\n") else kept
+today = datetime.date.today().isoformat()
+out = []
+for name, old, new in [
+    ("delegate", field("key"), new_del),
+    ("ante-registry", field("ante_registry_code_hash"), new_reg),
+    ("guestbook", field("guestbook_code_hash"), new_gb),
+]:
+    if old and old != new:
+        out.append(f'[[superseded]]\nartifact = "{name}"\nretired = "{today}"\nvalue = "{old}"\n')
+print("\n".join(out) + ("\n" if out else "") + kept.strip("\n"))
+PYEOF
+)"
+  fi
   cat > "$RECORD" <<EOF
 # Content addresses of everything whose bytes are its identity. GENERATED —
 # update only via: ANTE_ACCEPT_REKEY=1 ./scripts/check-keys.sh
@@ -83,6 +114,12 @@ key = "$DELEGATE_KEY"
 [contracts]
 ante_registry_code_hash = "$REGISTRY_CODE_HASH"
 guestbook_code_hash = "$GUESTBOOK_CODE_HASH"
+
+# --- lineage ---------------------------------------------------------------
+# Every generation that came before, newest first, appended automatically when
+# a re-key is accepted. A migration probe reads this to find predecessors; a
+# generation that is not here cannot be migrated from.
+$LINEAGE
 EOF
   echo "recorded:"
   echo "  delegate key        $DELEGATE_KEY"

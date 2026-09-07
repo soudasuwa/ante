@@ -105,7 +105,12 @@ tell people to save their code *before* upgrading.
 
 ## Superseded
 
-Kept so a stale id can be recognised rather than puzzled over.
+Kept so a stale id can be recognised rather than puzzled over — **and because
+these are the addresses a carry-forward migration will probe**. The machine-
+readable copy is `deployments.json` (`contracts.*.superseded`, newest first),
+appended automatically by the publish scripts; code-hash lineage lands in
+`artifact-keys.toml` the same way. A generation missing from those is state no
+migration can reach. See WHITEPAPER.md §16 item 7.
 
 | What | Old id | Why it moved |
 |---|---|---|

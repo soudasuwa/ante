@@ -32,6 +32,23 @@ echo "params: purpose=$PURPOSE floor=$FLOOR bits"
 INSTANCE_ID="$(fdev get-contract-id --code "$WASM" --parameters "$PARAMS")"
 echo "instance id: $INSTANCE_ID"
 
+# Record the generation this one replaces. The lineage has to accumulate as a
+# side effect of publishing, not depend on anyone remembering — a predecessor
+# that is not recorded is state a future migration cannot reach.
+python3 - "$REPO_ROOT/deployments.json" "registry" "$INSTANCE_ID" <<'PYEOF'
+import json, sys
+path, name, new = sys.argv[1:4]
+d = json.load(open(path))
+c = d["contracts"][name]
+old = c.get("instance", "")
+if old and old != new:
+    c.setdefault("superseded", []).insert(0, old)
+    print(f"  lineage: {name} {old} -> superseded")
+c["instance"] = new
+json.dump(d, open(path, "w"), indent=2)
+open(path, "a").write("\n")
+PYEOF
+
 echo "publishing…"
 # shellcheck disable=SC2086
 fdev $FDEV_ARGS publish --code "$WASM" --parameters "$PARAMS" contract

@@ -1,5 +1,5 @@
 {
-  "_comment": "Single source of truth for every live address. Read at BUILD TIME by the apps that link to each other, and checked against DEPLOYMENTS.md in CI. Never read at runtime: an address that can come from the URL lets a crafted link show attacker data under a genuine address (WHITEPAPER.md \u00a715).",
+  "_comment": "Single source of truth for every live address. Read at BUILD TIME by the apps that link to each other, and checked against DEPLOYMENTS.md in CI. Never read at runtime: an address that can come from the URL lets a crafted link show attacker data under a genuine address (WHITEPAPER.md \u00a715). `superseded` is the migration lineage, newest first: the instance ids a carry-forward probe GETs to recover state stranded by a re-key. Appended automatically by the publish scripts \u2014 a generation missing here cannot be migrated from.",
   "sites": {
     "home": {
       "title": "ante",
@@ -21,12 +21,22 @@
     "registry": {
       "instance": "8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU",
       "purpose": "ante:identity-level:v1",
-      "minBits": 12
+      "minBits": 12,
+      "superseded": [
+        "67bb1FuQfrsZnWLvGVDswwta2HMxtUEDQa93y3QasJKz",
+        "E8jXsQgvKkn1kzEpSDFwDRUbqZW3Tc1Z7BtmXQwyfb1J",
+        "GFFaptbqcNprDPCkpQmRnLQLdeeXv6kDVSoiM5B6YThK"
+      ]
     },
     "guestbook": {
       "instance": "Hs8VUxPnm6d62BU58489mEZ9tngNzEUdqBBTkmaLDBp",
       "purpose": "ante-guestbook:post:v1",
-      "minBits": 16
+      "minBits": 16,
+      "superseded": [
+        "FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw",
+        "3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL",
+        "Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9"
+      ]
     }
   }
 }

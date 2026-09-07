@@ -982,15 +982,50 @@ Roughly in priority order.
    similar would flatten the attacker/user gap considerably. The cost is a much
    more expensive verification, which a contract may not be able to afford —
    worth measuring before deciding.
-7. **A fixed-path (containerised) build**, so a third party can rebuild the
+7. **Carry-forward migration, before 1.0.** Today a re-key strands the
+   contract's state: your identity survives (recovery code) but your published
+   level does not, because it lived in a registry instance that moved. Fine in
+   beta; not shippable at release, since "never update" is not an option and
+   neither is losing data.
+
+   The ecosystem answer is
+   [`freenet-migrate`](https://github.com/freenet/freenet-migrate), which
+   packages what River and Delta each hand-rolled: a committed predecessor
+   registry, build-time hash validation with a CI guard, and a **sans-IO
+   backward-probe** the app drives — designed that way precisely because
+   "browsers have no request/response correlation". It builds for wasm32, so a
+   TypeScript UI can drive it through the adapter it already expects.
+
+   ante needs only part of it. Carry-forward normally means folding an opaque
+   state and hoping the validator catches problems; **ante's state decomposes
+   into independently-valid `AnteProof`s**, so migration is just resubmitting
+   them through the normal delta path, which re-validates every one via
+   `admit`. No `ComposableState`, no merge-then-verify — and permissionless,
+   since nothing unverified can enter. What is worth taking from the crate is
+   the probe's *decision* logic, which is the subtle part: silence is not
+   absence, and "`NotFound` is not proof either, and on this network it is
+   wrong more often than it is right."
+
+   Crucially the probe is client-side, so adopting it **re-keys nothing**.
+
+   The half that cannot wait, and is done: the **lineage**. Every superseded
+   generation is recorded automatically — code hashes into `artifact-keys.toml`
+   by `check-keys.sh` on an accepted re-key, instance ids into
+   `deployments.json` by the publish scripts. A predecessor that was never
+   recorded is state no migration can reach, and reconstructing one later means
+   git archaeology against builds that are only same-path reproducible. That is
+   why it accumulates as a side effect of the rituals rather than depending on
+   anyone's memory.
+
+8. **A fixed-path (containerised) build**, so a third party can rebuild the
    delegate and confirm the published key. Today the build is only same-path
    reproducible (§12.1), which catches accidental re-keys but does not let
    anyone verify the shipped bytes independently. A `Dockerfile` with a fixed
    `WORKDIR` is the whole fix.
-8. **`fdev verify-merge` in CI.** It runs today via `scripts/verify-merge.sh`
+9. **`fdev verify-merge` in CI.** It runs today via `scripts/verify-merge.sh`
    and passes cleanly, but CI does not install `fdev`, so it is a pre-publish
    step rather than a per-commit gate.
-9. **Memory-hard puzzles** — see item 6 above; kept separate because it changes
+10. **Memory-hard puzzles** — see item 6 above; kept separate because it changes
    the primitive rather than the packaging.
 
 ---
