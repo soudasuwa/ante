@@ -142,10 +142,15 @@ function render(shown: Shown[]) {
   }
 }
 
-/// Shown once the visitor has actually posted — the moment an identity was
-/// minted for them. Deliberately not on page load: someone who only reads the
-/// guestbook should not have a key created, and should not be told they have
-/// one when they do not.
+/// Shown once the visitor has actually posted. Deliberately not on page load:
+/// someone who only reads the guestbook should not have a key created for them,
+/// and `GetIdentity` would create one just by asking.
+///
+/// The wording says nothing about the key being *new*. It fires after every
+/// post, and there is no way to tell a freshly minted identity from a restored
+/// or long-standing one — `load_or_create` does not report which branch it
+/// took. Claiming "your node made it just now" was therefore false for anyone
+/// on their second post, and for anyone who had restored from a recovery code.
 function showIdentityNote(identityVk: Uint8Array) {
   $("my-fingerprint").textContent = fingerprint(identityVk);
   ($("backup-link") as HTMLAnchorElement).href = `/v1/contract/web/${ANTE_APP}/`;
