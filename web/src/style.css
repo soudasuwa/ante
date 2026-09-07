@@ -76,6 +76,18 @@ textarea {
   color: var(--fg);
   font: inherit;
 }
+/* A disabled field must LOOK disabled. The rule above sets an explicit
+   background and colour, which override the browser's native disabled
+   appearance — so a locked input renders exactly like an editable one and the
+   only clue is that typing does nothing. */
+input:disabled,
+textarea:disabled {
+  background: #f1f0ee;
+  color: var(--muted);
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
 /* Inline number inputs (e.g. "Grind to [N] bits"). */
 label input[type="number"] {
   width: 4.5rem;

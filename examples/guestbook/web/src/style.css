@@ -78,6 +78,18 @@ textarea {
   resize: vertical;
 }
 
+/* A disabled field must LOOK disabled. The rule above sets an explicit
+   background and colour, which override the browser's native disabled
+   appearance — so a locked input rendered exactly like an editable one and the
+   only clue was that typing did nothing. */
+input:disabled,
+textarea:disabled {
+  background: var(--disabled-bg, #f1f0ee);
+  color: var(--muted);
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
 input:focus,
 textarea:focus {
   outline: 2px solid var(--accent);
