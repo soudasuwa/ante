@@ -205,6 +205,19 @@ for name, built in (("registry", reg), ("guestbook", gb)):
 sys.exit(1 if bad else 0)
 PYEOF
 
+if [ "$MODE" = network ]; then
+  # NOTHING is published in network mode, and that is the point. The network
+  # already holds these contracts and these sites; a real newcomer's node fetches
+  # them. Publishing here would write to the REAL network from a throwaway test
+  # node: `fdev publish` PUTs empty state onto live contracts, and `website
+  # update` bumps the live sites to whatever happens to be in ./dist. Neither is
+  # destructive — a union merge means empty ∪ real = real, which is exactly what
+  # the merge laws buy — but both are real writes nobody asked for, and the
+  # second one publishes an unreviewed local build to real users.
+  echo "==> network mode: publishing nothing (the network already has it)"
+  echo "    contract state here is LIVE state, so the empty-state assertions"
+  echo "    below are skipped — they only mean anything on an isolated node."
+else
 echo "==> publishing onto the cold node"
 fdev -p "$WS_PORT" publish --code "$REG_WASM" --parameters "$WORK/reg.params" contract >/dev/null 2>&1
 fdev -p "$WS_PORT" publish --code "$GB_WASM"  --parameters "$WORK/gb.params"  contract >/dev/null 2>&1
@@ -246,6 +259,8 @@ for site in ante:web guestbook:examples/guestbook/web home:site; do
   fi
 done
 
+fi
+
 echo "==> starting dev servers (a code-iteration convenience, NOT the newcomer path)"
 (cd "$REPO_ROOT/web" && setsid npx vite --port "$VAULT_PORT" --strictPort \
    > "$WORK/vault-dev.log" 2>&1 < /dev/null &)
@@ -266,10 +281,21 @@ ANTE_KEY="$(fdev website list 2>/dev/null | awk '$1=="ante"{print $2}')"
 GB_KEY="$(fdev website list 2>/dev/null | awk '$1=="guestbook"{print $2}')"
 HOME_KEY="$(fdev website list 2>/dev/null | awk '$1=="home"{print $2}')"
 
+if [ "$MODE" = network ]; then
+  CONTEXT="cold environment ready, on the REAL network. the secret store is fresh —
+no identity, no delegate registration, no grants — so the identity and consent
+flow is genuinely first-time. contract state is NOT fresh: the guestbook holds
+real posts, the registry holds real levels, and anything you post here is a
+real post. this is the mode that can test signing."
+else
+  CONTEXT="cold environment ready, isolated. none of the $SUPERSEDED superseded generations
+exist on this node, so every migration probe will fail — silence is the correct
+outcome, and an empty book is the correct outcome."
+fi
+
 cat <<EOF
 
-cold environment ready. none of the $SUPERSEDED superseded generations exist on this
-node, so every migration probe will fail — silence is the correct outcome.
+$CONTEXT
 
 TEST HERE — served by the node, which is what a newcomer actually opens:
 
@@ -279,11 +305,13 @@ TEST HERE — served by the node, which is what a newcomer actually opens:
 
 walk it in this order:
   1. guestbook FIRST, without ever opening the vault. it should mint an
-     identity and show an empty book, with no migration chatter.
+     identity with no migration chatter$( [ "$MODE" = local ] && echo ", and show an empty book" ).
   2. then the vault. it should find the identity the guestbook already made,
      not mint a second one.
-  3. post, then reload. posting is what first gives the contract non-empty
-     state, so this is where the zero-byte path stops being the one in use.
+  3. sign and post.$( [ "$MODE" = local ] \
+       && echo " (WILL FAIL in local mode — see the NOTE below.)" \
+       || echo " your node should raise a consent prompt; that prompt
+     is the thing local mode cannot do." )
 
 $( [ "$MODE" = local ] && cat <<'LOCALNOTE'
 NOTE: this is LOCAL mode, which has no consent-prompt machinery at all — see
