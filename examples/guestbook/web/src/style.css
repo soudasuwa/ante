@@ -206,3 +206,24 @@ button.ghost {
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* "you now have an Ante key" — shown after a first post */
+.identity-note {
+  margin-top: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: #fbfaf8;
+}
+.identity-note p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+.identity-note p + p {
+  margin-top: 0.45rem;
+}
+.identity-note code {
+  font-weight: 600;
+  color: var(--accent);
+}

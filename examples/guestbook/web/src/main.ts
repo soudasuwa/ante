@@ -41,6 +41,12 @@ interface Shown {
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/// The ante identity app, for the "back up your key" link. Safe to hardcode:
+/// an `fdev website` address is blake3(container_wasm ‖ publisher_key), and
+/// neither input contains the site content — so unlike a data contract, this
+/// URL is permanent and survives every update. `?vault=<id>` overrides it.
+const ANTE_APP = "AGdogAU4KTER6MpmLcYVAUjPGat3sQS536crq7wPYb2r";
+
 let gb: Guestbook | null = null;
 let ante: Awaited<ReturnType<typeof attachAnte>> | null = null;
 /// The in-flight grind, if the compose form is currently working.
@@ -128,6 +134,17 @@ function render(shown: Shown[]) {
     for (const s of inTier) section.appendChild(entryCard(s));
     list.appendChild(section);
   }
+}
+
+/// Shown once the visitor has actually posted — the moment an identity was
+/// minted for them. Deliberately not on page load: someone who only reads the
+/// guestbook should not have a key created, and should not be told they have
+/// one when they do not.
+function showIdentityNote(identityVk: Uint8Array) {
+  $("my-fingerprint").textContent = fingerprint(identityVk);
+  const vault = new URLSearchParams(location.search).get("vault") ?? ANTE_APP;
+  ($("backup-link") as HTMLAnchorElement).href = `/v1/contract/web/${vault}/`;
+  $("identity-note").hidden = false;
 }
 
 function entryCard({ entry, bits }: Shown): HTMLElement {
@@ -262,6 +279,7 @@ async function submit() {
     await gb.post({ ...input, proof: outcome.proof });
     ($("text") as HTMLTextAreaElement).value = "";
     progress.textContent = "posted.";
+    showIdentityNote(outcome.proof.identityVk);
     generation++;
     session = null;
     setComposeState("idle");
