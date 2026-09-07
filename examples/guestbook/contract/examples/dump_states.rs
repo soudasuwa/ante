@@ -6,7 +6,7 @@
 //! transition_path_agreement rather than only the order-independence laws.
 //! `scripts/verify-merge.sh` drives this.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ante_core::{pow, proof::AnteProof};
 use ante_guestbook_contract::{content_purpose, Entry, GuestbookState};
@@ -27,7 +27,7 @@ fn entry(seed: u8, name: &str, text: &str) -> Entry {
     }
 }
 
-fn write(dir: &PathBuf, name: &str, state: &GuestbookState) {
+fn write(dir: &Path, name: &str, state: &GuestbookState) {
     let mut bytes = Vec::new();
     ciborium::into_writer(state, &mut bytes).expect("serialize");
     std::fs::write(dir.join(name), bytes).expect("write");

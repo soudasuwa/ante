@@ -4,7 +4,7 @@
 //!
 //! See `scripts/verify-merge.sh`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ante_core::{
     pow,
@@ -29,7 +29,7 @@ fn proof(seed: u8, bits: u32) -> AnteProof {
     AnteProof::create(&key, PURPOSE.into(), nonce, 1_726_000_000_000)
 }
 
-fn write(dir: &PathBuf, name: &str, state: &RegistryState) {
+fn write(dir: &Path, name: &str, state: &RegistryState) {
     let mut bytes = Vec::new();
     ciborium::into_writer(state, &mut bytes).expect("serialize");
     std::fs::write(dir.join(name), bytes).expect("write");
