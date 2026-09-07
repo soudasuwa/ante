@@ -77,13 +77,26 @@ echo "==> starting a node that has never seen ante ($IMAGE, ws :$WS_PORT)"
 # --rm so nothing survives to warm up the next run. No volume, for the same
 # reason: the writable layer goes with the container.
 #
-# The client API is fully privileged, so it is bound to 0.0.0.0 only INSIDE the
-# container and published to the host's loopback alone — never 0.0.0.0 on the
-# host. Under Docker's default bridge, loopback-in-container would be
-# unreachable from a browser, which is why the bind address is widened at all.
+# HOST NETWORKING IS LOAD-BEARING, not a shortcut around publishing a port.
+# The consent prompt endpoints (/permission/*) are gated on the request coming
+# from loopback — `peer_is_loopback`, which fails closed. Under Docker's default
+# bridge the host reaches the container via the bridge gateway address, so every
+# one of those requests arrives from 172.x and is refused with a 403. The
+# browser then cannot subscribe to /permission/events/ws, the overlay never
+# renders, nobody can answer, and every prompting operation — Commit, export,
+# import — fails. A bridge-networked harness does not test the consent path; it
+# breaks it, and would have reported a fault in our code that was not there.
+#
+# With host networking the container's loopback IS the host's, so the gate
+# passes and the API keeps its default loopback-only bind. That bind is why no
+# port is published and why FREENET_WS_API_ADDRESS is deliberately NOT set: the
+# client API is fully privileged, and widening it is only needed under bridge,
+# which is the arrangement we just rejected.
+#
+# Needs Linux. On Docker Desktop host networking is not the same thing, and the
+# consent path cannot be tested this way.
 docker run -d --rm --name "$NAME" \
-  -p "127.0.0.1:$WS_PORT:$WS_PORT" \
-  -e FREENET_WS_API_ADDRESS=0.0.0.0 \
+  --network host \
   -e FREENET_LOG_TO_CONSOLE=1 \
   -e RUST_LOG="${ANTE_COLD_LOG:-freenet=debug}" \
   --entrypoint /bin/sh \
@@ -104,6 +117,19 @@ echo "    up: $(curl -s "http://127.0.0.1:$WS_PORT/v1/version")"
 # Regenerate params from the values of record rather than reusing a file, so a
 # drift between deployments.json and what we actually build fails here instead
 # of at publish time.
+# Cheap, and it fails in the one way that is otherwise invisible until a human
+# clicks a button 60 seconds into a manual test.
+echo "==> checking the consent-prompt endpoint accepts us as loopback"
+code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:$WS_PORT/permission/pending" || echo 000)"
+if [ "$code" = "200" ]; then
+  echo "    ok  /permission/pending -> 200"
+else
+  echo "    BAD /permission/pending -> $code (403 means we are not loopback to the node;" >&2
+  echo "        consent prompts cannot be delivered or answered, so Commit/export/import" >&2
+  echo "        would all fail for reasons that are the harness's fault, not ante's)" >&2
+  exit 1
+fi
+
 echo "==> rebuilding params and confirming the recorded addresses derive from them"
 REG_WASM="$REPO_ROOT/contracts/ante-registry/target/wasm32-unknown-unknown/release/ante_registry_contract.wasm"
 GB_WASM="$REPO_ROOT/examples/guestbook/contract/target/wasm32-unknown-unknown/release/ante_guestbook_contract.wasm"
@@ -154,7 +180,26 @@ for pair in "registry:$REG_ID" "guestbook:$GB_ID"; do
 done
 [ "$fail" -eq 0 ] || exit 1
 
-echo "==> starting dev servers (?node= is dev-build only, hence dev servers)"
+# The apps have to be served BY the node, not by a dev server, for the consent
+# path to exist at all. The prompt overlay is part of the node's gateway shell
+# page and is delivered over /permission/events/ws to "every open Freenet tab";
+# a vite tab is a different origin running our app alone, so it never subscribes
+# and no prompt can ever render or be answered there. It is also the only way
+# the delegate sees a real MessageOrigin::WebApp attestation, which is what
+# grants and the prompt's own origin check are keyed on. Testing Commit from a
+# dev server tests neither.
+echo "==> publishing the web apps onto the cold node"
+for site in ante:web guestbook:examples/guestbook/web home:site; do
+  key="${site%%:*}"; dir="${site#*:}"
+  if [ -d "$REPO_ROOT/$dir/dist" ]; then
+    fdev -p "$WS_PORT" website update "$REPO_ROOT/$dir/dist" --key "$key" >/dev/null 2>&1 \
+      && echo "    ok  $key" || echo "    BAD $key failed to publish"
+  else
+    echo "    -   $key skipped ($dir/dist not built)"
+  fi
+done
+
+echo "==> starting dev servers (a code-iteration convenience, NOT the newcomer path)"
 (cd "$REPO_ROOT/web" && setsid npx vite --port "$VAULT_PORT" --strictPort \
    > "$WORK/vault-dev.log" 2>&1 < /dev/null &)
 (cd "$REPO_ROOT/examples/guestbook/web" && setsid npx vite --port "$GB_PORT" --strictPort \
@@ -169,13 +214,21 @@ SUPERSEDED=$(python3 -c "
 import json;d=json.load(open('$REPO_ROOT/deployments.json'))
 print(sum(len(d['contracts'][n].get('superseded',[])) for n in ('registry','guestbook')))")
 
+GW="http://127.0.0.1:$WS_PORT/v1/contract/web"
+ANTE_KEY="$(fdev website list 2>/dev/null | awk '$1=="ante"{print $2}')"
+GB_KEY="$(fdev website list 2>/dev/null | awk '$1=="guestbook"{print $2}')"
+HOME_KEY="$(fdev website list 2>/dev/null | awk '$1=="home"{print $2}')"
+
 cat <<EOF
 
 cold environment ready. none of the $SUPERSEDED superseded generations exist on this
 node, so every migration probe will fail — silence is the correct outcome.
 
-  guestbook  http://127.0.0.1:$GB_PORT/?node=127.0.0.1:$WS_PORT
-  vault      http://127.0.0.1:$VAULT_PORT/?node=127.0.0.1:$WS_PORT
+TEST HERE — served by the node, which is what a newcomer actually opens:
+
+  guestbook  $GW/$GB_KEY/
+  vault      $GW/$ANTE_KEY/
+  home       $GW/$HOME_KEY/
 
 walk it in this order:
   1. guestbook FIRST, without ever opening the vault. it should mint an
@@ -184,6 +237,13 @@ walk it in this order:
      not mint a second one.
   3. post, then reload. posting is what first gives the contract non-empty
      state, so this is where the zero-byte path stops being the one in use.
+
+the dev servers below are for iterating on code, and CANNOT test signing:
+the consent overlay belongs to the node's gateway shell, so it never renders
+on a dev-server origin and every prompt there auto-denies after 60s.
+
+  guestbook  http://127.0.0.1:$GB_PORT/?node=127.0.0.1:$WS_PORT
+  vault      http://127.0.0.1:$VAULT_PORT/?node=127.0.0.1:$WS_PORT
 
   ./scripts/cold-start.sh --logs    watch the node (consent prompts included)
   ./scripts/cold-start.sh --down    when finished
