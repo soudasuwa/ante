@@ -311,6 +311,34 @@ with each variable-length field length-prefixed, for the same reason the
 challenge layout prefixes `purpose` (§4.1). Every distinct message becomes its
 own challenge and requires its own search.
 
+**A doc comment on this function re-keys the contract.** Measured while writing
+the paragraph below: adding seven comment lines above `content_purpose` moved the
+guestbook's code hash, because `line!()` from a panic elsewhere in the file is
+baked into rodata and every line after the insertion shifted. `panic = "abort"`
+and `strip = true` do not prevent it. So the reasoning lives here rather than
+beside the code — a comment is not worth stranding a guestbook, and the next
+person to reach for one should know the price before they pay it.
+
+**Why 8 bytes of digest, and when that stops being enough.** The tag is
+truncated to 64 bits. The attacker controls *both* messages, so the relevant
+attack is a birthday collision — about 2^32 hashes to find two messages sharing
+a tag, and thus one proof that validates both.
+
+That is safe here only because of the economics, not because 2^32 is large.
+Guestbook posts demand 16 bits and users grind 18–24, so an attacker would spend
+2^32 work to avoid spending 2^20 — roughly four thousand times the cost of
+simply doing what was asked. The defence is that the attack is worth less than
+the thing it steals.
+
+The margin is not universal, and a consumer must check it rather than inherit
+it. An application demanding 30+ bits per action has moved 2^32 into the same
+order as one honest grind, and a k-way multi-collision is the only thing making
+more than two messages per proof expensive. If your `min_bits` approaches 32, or
+one proof is worth far more than one action, widen the tag to 16 bytes. Sizing a
+truncated digest is a function of what the colliding party controls and what a
+collision is worth — here they control everything and it is worth almost
+nothing.
+
 This is the same mechanism §3 prescribes for freshness (`myapp:comment:2026-W12`).
 The purpose string is the *only* place an application can express what a proof
 is for, so the design question for any consumer is: **what could an attacker
