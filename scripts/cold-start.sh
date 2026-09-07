@@ -10,9 +10,36 @@
 # to people who had nothing to migrate, so a first-time visitor's opening screen
 # read "3 earlier registries did not answer".
 #
-#   ./scripts/cold-start.sh          # bring it up
-#   ./scripts/cold-start.sh --down   # tear it all down
-#   ./scripts/cold-start.sh --logs   # follow the node log
+#   ./scripts/cold-start.sh            # local mode (default)
+#   ./scripts/cold-start.sh --network  # network mode, the only way to test signing
+#   ./scripts/cold-start.sh --down     # tear it all down
+#   ./scripts/cold-start.sh --logs     # follow the node log
+#
+# CONSENT PROMPTS DO NOT EXIST IN LOCAL MODE. This is a property of freenet-core,
+# not of the harness or of ante, and it cost a day to find, so it is written down
+# here rather than left to be rediscovered:
+#
+#   `run_local_node` (node.rs) calls `executor.delegate_request(...)` and returns
+#   the result straight to the client. The whole RequestUserInput ->
+#   DashboardPrompter -> UserResponse loop lives in `contract_handling`, which is
+#   spawned from exactly one place: p2p_impl.rs, the NETWORK-mode node.
+#
+# So under `freenet local` a delegate that prompts gets its RequestUserInput
+# handed back to the caller verbatim. Nothing prompts, nothing answers, and the
+# app sees a response with no ApplicationMessage in it. Every prompting operation
+# — Commit, export, import — fails, and it looks exactly like a bug in the app.
+# It is not. Use --network to test any of them.
+#
+# What each mode is actually good for:
+#
+#   local    empty contract state, the zero-byte decode path, migration silence
+#            for a first-time visitor. Isolated, fast, deterministic, offline.
+#            Cannot sign.
+#   network  the consent round-trip and the real newcomer identity flow, on a
+#            cold secret store with no delegate registration and no grants.
+#            Joins the REAL network, so contract state is the REAL published
+#            state — the guestbook will have real posts in it, and anything you
+#            post there is a real post. Not a sandbox.
 #
 # WHY DOCKER, and not a `freenet local` on the host
 #
@@ -51,6 +78,11 @@ WS_PORT="${ANTE_COLD_PORT:-7599}"
 VAULT_PORT="${ANTE_COLD_VAULT_PORT:-5173}"
 GB_PORT="${ANTE_COLD_GB_PORT:-5174}"
 WORK="${ANTE_COLD_DIR:-/tmp/ante-cold}"
+# local | network. See the CONSENT note below before changing the default.
+MODE="${ANTE_COLD_MODE:-local}"
+[ "${1:-}" = "--network" ] && { MODE=network; shift; }
+[ "${1:-}" = "--local" ] && { MODE=local; shift; }
+NET_PORT="${ANTE_COLD_NET_PORT:-31338}"
 
 case "${1:-}" in
   --down)
@@ -73,7 +105,7 @@ pkill -f "vite --port $VAULT_PORT" 2>/dev/null || true
 pkill -f "vite --port $GB_PORT" 2>/dev/null || true
 rm -rf "$WORK"; mkdir -p "$WORK"
 
-echo "==> starting a node that has never seen ante ($IMAGE, ws :$WS_PORT)"
+echo "==> starting a node that has never seen ante ($MODE mode, $IMAGE, ws :$WS_PORT)"
 # --rm so nothing survives to warm up the next run. No volume, for the same
 # reason: the writable layer goes with the container.
 #
@@ -95,14 +127,29 @@ echo "==> starting a node that has never seen ante ($IMAGE, ws :$WS_PORT)"
 #
 # Needs Linux. On Docker Desktop host networking is not the same thing, and the
 # consent path cannot be tested this way.
-docker run -d --rm --name "$NAME" \
-  --network host \
-  -e FREENET_LOG_TO_CONSOLE=1 \
-  -e RUST_LOG="${ANTE_COLD_LOG:-freenet=debug}" \
-  --entrypoint /bin/sh \
-  "$IMAGE" \
-  -c "mkdir -p /data/config /data/node /data/logs && exec /usr/local/lib/freenet/freenet local \
-      --ws-api-port $WS_PORT --config-dir /data/config --data-dir /data/node" >/dev/null
+if [ "$MODE" = network ]; then
+  # Network mode uses the image's own entrypoint, which is the update supervisor
+  # and runs `freenet network`. A fresh container still gives a cold secret store
+  # and no delegate registration, which is the part a newcomer test needs; what
+  # it does NOT give is empty contract state, because the node fetches the real
+  # published contracts from the real network.
+  docker run -d --rm --name "$NAME" \
+    --network host \
+    -e FREENET_LOG_TO_CONSOLE=1 \
+    -e RUST_LOG="${ANTE_COLD_LOG:-freenet=info}" \
+    -e WS_API_PORT="$WS_PORT" \
+    -e NETWORK_PORT="$NET_PORT" \
+    "$IMAGE" >/dev/null
+else
+  docker run -d --rm --name "$NAME" \
+    --network host \
+    -e FREENET_LOG_TO_CONSOLE=1 \
+    -e RUST_LOG="${ANTE_COLD_LOG:-freenet=info}" \
+    --entrypoint /bin/sh \
+    "$IMAGE" \
+    -c "mkdir -p /data/config /data/node /data/logs && exec /usr/local/lib/freenet/freenet local \
+        --ws-api-port $WS_PORT --config-dir /data/config --data-dir /data/node" >/dev/null
+fi
 
 for _ in $(seq 1 90); do
   curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:$WS_PORT/v1/version" 2>/dev/null && break
@@ -238,9 +285,18 @@ walk it in this order:
   3. post, then reload. posting is what first gives the contract non-empty
      state, so this is where the zero-byte path stops being the one in use.
 
-the dev servers below are for iterating on code, and CANNOT test signing:
+$( [ "$MODE" = local ] && cat <<'LOCALNOTE'
+NOTE: this is LOCAL mode, which has no consent-prompt machinery at all — see
+the header. Signing, export and import WILL fail here with "the node returned
+only RequestUserInput", and that is the harness, not ante. To test those:
+
+  ./scripts/cold-start.sh --network
+
+LOCALNOTE
+)
+the dev servers below are for iterating on code, and cannot test signing either:
 the consent overlay belongs to the node's gateway shell, so it never renders
-on a dev-server origin and every prompt there auto-denies after 60s.
+on a dev-server origin.
 
   guestbook  http://127.0.0.1:$GB_PORT/?node=127.0.0.1:$WS_PORT
   vault      http://127.0.0.1:$VAULT_PORT/?node=127.0.0.1:$WS_PORT

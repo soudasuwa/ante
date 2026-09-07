@@ -70,16 +70,40 @@ export async function registerDelegate(
   return Uint8Array.from(ack.key?.key ?? []);
 }
 
-const OUTBOUND_APPLICATION_MESSAGE = 1; // OutboundDelegateMsgType.common_ApplicationMessage
+// OutboundDelegateMsgType. Named rather than compared as bare integers so a
+// "nothing came back" failure can say WHAT came back instead — the difference
+// between an empty response and one carrying only a context update is the whole
+// diagnosis, and without it both read as silence.
+const OUTBOUND_KIND: Record<number, string> = {
+  0: "none",
+  1: "ApplicationMessage",
+  2: "RequestUserInput",
+  3: "ContextUpdated",
+};
+const OUTBOUND_APPLICATION_MESSAGE = 1;
 
 export interface DelegateReply {
   /// ApplicationMessage payloads in the response — the delegate's answers.
   payloads: Uint8Array[];
+  /// Every outbound kind the node sent back, in order, named. Empty when the
+  /// response carried nothing at all. Only used to describe a failure.
+  kinds: string[];
+}
+
+/// Describe a reply that carried no answer, for an error message. "No response"
+/// and "a response with no answer in it" are different faults with different
+/// causes, and telling them apart from a user's bug report is otherwise
+/// impossible.
+export function describeEmptyReply(reply: DelegateReply): string {
+  if (reply.kinds.length === 0) return "the node returned an empty response";
+  return `the node returned only ${reply.kinds.join(", ")}`;
 }
 
 function readReply(response: DelegateResponse): DelegateReply {
   const payloads: Uint8Array[] = [];
+  const kinds: string[] = [];
   for (const outbound of response.values ?? []) {
+    kinds.push(OUTBOUND_KIND[outbound.inboundType] ?? `unknown(${outbound.inboundType})`);
     if (outbound.inboundType === OUTBOUND_APPLICATION_MESSAGE) {
       const msg = outbound.inbound as { payload?: number[] } | null;
       if (msg?.payload?.length) payloads.push(Uint8Array.from(msg.payload));
@@ -88,7 +112,7 @@ function readReply(response: DelegateResponse): DelegateReply {
     // consent prompt) and never reaches the client — the one DelegateResponse
     // we get back carries the post-approval outcome.
   }
-  return { payloads };
+  return { payloads, kinds };
 }
 
 /// Send one ApplicationMessage payload to the delegate and read the response.

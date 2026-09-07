@@ -15,6 +15,7 @@ import {
 import {
   base64ToBytes,
   registerDelegate,
+  describeEmptyReply,
   sendToDelegate,
   type DelegateAddress,
 } from "./delegate-msg";
@@ -356,7 +357,9 @@ export class AnteClient {
 
   private async oneShot(request: CborValue): Promise<{ variant: string; fields: CborValue | null }> {
     const reply = await sendToDelegate(this.client, this.delegate, cborEncode(request));
-    if (reply.payloads.length === 0) throw new Error("ante delegate returned no response");
+    if (reply.payloads.length === 0) {
+      throw new Error(`ante delegate returned no response — ${describeEmptyReply(reply)}`);
+    }
     const parsed = enumVariant(cborDecode(reply.payloads[0]));
     if (parsed.variant === "Error") {
       throw new Error(`ante delegate: ${asString(mapGet(parsed.fields!, "message"))}`);
@@ -379,7 +382,9 @@ export class AnteClient {
       cborEncode(request),
       PROMPT_TIMEOUT_MS,
     );
-    if (reply.payloads.length === 0) throw new Error("no response from the delegate");
+    if (reply.payloads.length === 0) {
+      throw new Error(`no response from the delegate — ${describeEmptyReply(reply)}`);
+    }
     const parsed = enumVariant(cborDecode(reply.payloads[0]));
     if (parsed.variant === "Denied") return { denied: true };
     if (parsed.variant === "Error") {
