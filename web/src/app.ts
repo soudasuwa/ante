@@ -55,6 +55,15 @@ async function boot() {
     $("recovery-panel").hidden = false;
     $("action-panel").hidden = false;
 
+    // Nothing to recover FROM when no earlier delegate generation exists, and
+    // the panel cannot say so honestly: with an empty predecessor list the
+    // search concludes instantly and reports "the earlier versions answered,
+    // and none holds a different identity" — about versions that do not exist.
+    // A control whose only possible outcome is a false statement should not be
+    // on screen. It returns by itself the moment a re-key records a
+    // predecessor, which is exactly when it becomes true again.
+    $("recovery-previous").hidden = deployments.delegate.superseded.length === 0;
+
     setConn(registry ? "ready" : "ready — no registry configured, level not tracked", "ok");
     await refreshLevel();
     void refreshGrants();

@@ -1069,9 +1069,17 @@ Roughly in priority order.
    by `check-keys.sh` on an accepted re-key, instance ids into
    `deployments.json` by the publish scripts. A predecessor that was never
    recorded is state no migration can reach, and reconstructing one later means
-   git archaeology against builds that are only same-path reproducible. That is
-   why it accumulates as a side effect of the rituals rather than depending on
-   anyone's memory.
+   git archaeology plus a rebuild of the exact commit. That is why it
+   accumulates as a side effect of the rituals rather than depending on anyone's
+   memory. (When this was written a rebuild would not have settled it either,
+   because the build was only same-path reproducible; item 8 fixed that, so the
+   archaeology is now at least conclusive.)
+
+   One deliberate exception, at launch: every runtime `superseded` list was
+   emptied on purpose so the public apps start clean rather than sweeping
+   pre-release test data forward. `artifact-keys.toml` still records the full
+   key history — what bytes were ever published is a different question from
+   what the apps should read today.
 
 8. **A fixed-path (containerised) build — done (2026-09-07).** `build/Dockerfile`
    builds at a fixed `WORKDIR`, `CARGO_HOME` and `RUSTUP_HOME`, which is what
