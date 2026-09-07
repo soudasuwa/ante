@@ -11,9 +11,29 @@
 # code_hash here plus unchanged params means a stable address. The live
 # instance ids are in DEPLOYMENTS.md.
 [delegate]
-code_hash = "3b831048a0dd20f8efa5793cecad59f949f2c68a3fea81ffa958613d7436efcb"
-key = "84b825053c1560bcdc7a7a1a3e08096e8b5d231f0af3a30e887ca1f18adf0411"
+code_hash = "26208af6a21c9dcf3e3e445fb044444bce821db69a9f57c802d00c0a8bfdc049"
+key = "3201ab4b201cf4d41fab0e93604d6a29211669396108e4a478d7f14dfa468407"
 
 [contracts]
-ante_registry_code_hash = "dd15a03d6ffe2dd8638a2b2cd448b55beb2492f9f4d91b97f7de2ed6205b3425"
-guestbook_code_hash = "4668bb50ebb100352a4914eecbabe0725b38d86a994af5169c65bdf4ad376095"
+ante_registry_code_hash = "01a39d530c49d3427e2c9ec611abf6809775b2967642e3541664b73251eaea80"
+guestbook_code_hash = "2931d0910afa0aecf60e5d301b6436108156476c151c51aba683ffc396942ee8"
+
+# --- lineage ---------------------------------------------------------------
+# Every generation that came before, newest first, appended automatically when
+# a re-key is accepted. A migration probe reads this to find predecessors; a
+# generation that is not here cannot be migrated from.
+[[superseded]]
+artifact = "delegate"
+retired = "2026-09-07"
+value = "84b825053c1560bcdc7a7a1a3e08096e8b5d231f0af3a30e887ca1f18adf0411"
+code_hash = "3b831048a0dd20f8efa5793cecad59f949f2c68a3fea81ffa958613d7436efcb"
+
+[[superseded]]
+artifact = "ante-registry"
+retired = "2026-09-07"
+value = "dd15a03d6ffe2dd8638a2b2cd448b55beb2492f9f4d91b97f7de2ed6205b3425"
+
+[[superseded]]
+artifact = "guestbook"
+retired = "2026-09-07"
+value = "4668bb50ebb100352a4914eecbabe0725b38d86a994af5169c65bdf4ad376095"

@@ -93,6 +93,15 @@ fn dispatch(
             }
         }
 
+        // Deliberately `load_existing`, not `load_or_create`: this is the one
+        // identity request that must never write. See AnteRequest::HasIdentity.
+        AnteRequest::HasIdentity => Ok(vec![reply(&match identity::load_existing(env) {
+            Some(key) => AnteResponse::Identity {
+                verifying_key: key.verifying_key().to_bytes(),
+            },
+            None => AnteResponse::NoIdentity,
+        })]),
+
         AnteRequest::ListGrants => Ok(vec![reply(&AnteResponse::Grants {
             origins: grants::list(env),
         })]),

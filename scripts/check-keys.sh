@@ -42,7 +42,26 @@ GUESTBOOK_WASM="$REPO_ROOT/examples/guestbook/contract/target/wasm32-unknown-unk
 # a hash taken from such a leftover is worse than no hash at all: it makes the
 # guard disagree with what actually gets published. (This is not hypothetical;
 # it is how the first recorded value for the guestbook came to be wrong.)
-# Cargo no-ops when nothing changed, so this is cheap.
+# Cargo no-ops when nothing changed, which is cheap but NOT sufficient on its
+# own: cargo's fingerprint does not include the toolchain's installation path,
+# only the source and flags. So an artifact cached under one toolchain is reused
+# under another, and this guard passes on bytes that the current environment
+# would never produce. That is not hypothetical either — it is how the published
+# delegate key came to be one that no clean build reproduces, while every check
+# in between reported a cheerful green tick in under a second.
+#
+# The toolchain identity is therefore part of the cache key. When it changes,
+# the target directories go, and everything is rebuilt from source.
+STAMP="$REPO_ROOT/.artifact-build-stamp"
+TOOLCHAIN_ID="$(rustc -vV | tr '\n' ' ')|$(rustc --print sysroot)"
+if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$TOOLCHAIN_ID" ]; then
+  [ -f "$STAMP" ] && echo "toolchain changed since the last build — rebuilding from scratch" >&2
+  rm -rf "$REPO_ROOT/ante-delegate/target" \
+         "$REPO_ROOT/contracts/ante-registry/target" \
+         "$REPO_ROOT/examples/guestbook/contract/target"
+  printf '%s' "$TOOLCHAIN_ID" > "$STAMP"
+fi
+
 build() {
   echo "building $1…" >&2
   case "$1" in

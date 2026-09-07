@@ -19,20 +19,22 @@
   },
   "contracts": {
     "registry": {
-      "instance": "8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU",
+      "instance": "FxrfzJC3pwTdRg9gNY2Nhj34FnHsXyGDCVzbJXxL7zaz",
       "purpose": "ante:identity-level:v1",
       "minBits": 12,
       "superseded": [
+        "8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU",
         "67bb1FuQfrsZnWLvGVDswwta2HMxtUEDQa93y3QasJKz",
         "E8jXsQgvKkn1kzEpSDFwDRUbqZW3Tc1Z7BtmXQwyfb1J",
         "GFFaptbqcNprDPCkpQmRnLQLdeeXv6kDVSoiM5B6YThK"
       ]
     },
     "guestbook": {
-      "instance": "Hs8VUxPnm6d62BU58489mEZ9tngNzEUdqBBTkmaLDBp",
+      "instance": "EXsqzKvKBJJ5BD69LQPXJERXQpUNCn8L1TPEHAoDRofd",
       "purpose": "ante-guestbook:post:v1",
       "minBits": 16,
       "superseded": [
+        "Hs8VUxPnm6d62BU58489mEZ9tngNzEUdqBBTkmaLDBp",
         "FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw",
         "3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL",
         "Fw691FL9RYGJmYm7mVxhyMMTUy4KdWWCJXxUUNFzHgr9"
@@ -41,10 +43,14 @@
   },
   "delegate": {
     "current": {
-      "key": "84b825053c1560bcdc7a7a1a3e08096e8b5d231f0af3a30e887ca1f18adf0411",
-      "codeHash": "3b831048a0dd20f8efa5793cecad59f949f2c68a3fea81ffa958613d7436efcb"
+      "key": "3201ab4b201cf4d41fab0e93604d6a29211669396108e4a478d7f14dfa468407",
+      "codeHash": "26208af6a21c9dcf3e3e445fb044444bce821db69a9f57c802d00c0a8bfdc049"
     },
     "superseded": [
+      {
+        "key": "84b825053c1560bcdc7a7a1a3e08096e8b5d231f0af3a30e887ca1f18adf0411",
+        "codeHash": "3b831048a0dd20f8efa5793cecad59f949f2c68a3fea81ffa958613d7436efcb"
+      },
       {
         "key": "3631e9328860295d00526b3ee1535bce5c5f6bf8afe3aa2624aff5e36b074915",
         "codeHash": "92372684b18ad42d7762138351eeab49344cd378c0b3f39da1a4b23603b05d94",

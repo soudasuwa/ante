@@ -19,7 +19,7 @@ default = ["freenet-main-contract"]
 freenet-main-contract = []
 
 [dependencies]
-ante-core = { path = "../../ante-core" }
+ante-core = { path = "../../ante-core", default-features = false }
 freenet-stdlib = { version = "=0.8.5", features = ["contract"] }
 ciborium = "0.2"
 serde = "1"

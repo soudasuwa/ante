@@ -20,7 +20,7 @@ freenet-main-contract = []
 [dependencies]
 # The consuming side links only this — no delegate, no key custody. It pulls
 # ed25519/blake3/serde transitively, which is all a verifier needs.
-ante-core = { path = "../../../ante-core" }
+ante-core = { path = "../../../ante-core", default-features = false }
 freenet-stdlib = { version = "=0.8.5", features = ["contract"] }
 serde = { version = "1", features = ["derive"] }
 ciborium = "0.2"

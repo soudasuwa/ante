@@ -52,10 +52,18 @@ WebSocket API; there is nothing to render.
 
 | Contract | Instance | Parameters | Publish |
 |---|---|---|---|
-| ante-registry | `8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
-| guestbook example | `Hs8VUxPnm6d62BU58489mEZ9tngNzEUdqBBTkmaLDBp` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
+| ante-registry | `FxrfzJC3pwTdRg9gNY2Nhj34FnHsXyGDCVzbJXxL7zaz` | purpose `ante:identity-level:v1`, floor 12 bits | `./scripts/publish-registry.sh` |
+| guestbook example | `EXsqzKvKBJJ5BD69LQPXJERXQpUNCn8L1TPEHAoDRofd` | purpose `ante-guestbook:post:v1`, min_bits 16 | `./scripts/publish-guestbook.sh` |
 
-The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`FFAmy…`).
+Both moved on 2026-09-07. The build was found to be non-reproducible — the
+toolchain's *installation directory name* leaked into every artifact, so the
+same compiler installed under two names produced two different addresses — and
+fixing that changed the bytes, which changes the address. The previous
+generations are recorded in `deployments.json` under `superseded`, and both apps
+sweep them on load to carry levels and posts forward. They stay readable;
+nothing was deleted.
+
+The guestbook *website* (`HLqqo…`) reads the guestbook *contract* (`EXsqz…`).
 Two different ids for one example — that is the normal shape of a Freenet app,
 not a quirk of this one.
 
@@ -66,7 +74,7 @@ the existing instance without republishing:
 
 ```bash
 ./scripts/gen-embedded.sh ante-delegate/target/wasm32-unknown-unknown/release/ante_delegate.wasm \
-  8UbBGr5XRnY7rJ1aAjMj4jEKtiahDSoXQTEwQ1jJqfHU
+  FxrfzJC3pwTdRg9gNY2Nhj34FnHsXyGDCVzbJXxL7zaz
 ```
 
 ## Who can move a pointer

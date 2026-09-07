@@ -59,8 +59,40 @@ async function boot() {
     await refreshLevel();
     void refreshGrants();
     void sweepPredecessors();
+    void detectStranded();
   } catch (err) {
     setConn(`could not reach the delegate: ${(err as Error).message}`, "err");
+  }
+}
+
+/// Look, on load, for an identity stranded by an earlier delegate generation.
+///
+/// This can only run automatically because the probe is `HasIdentity`, which is
+/// a pure read. It used to be `GetIdentity`, which creates on miss — so an
+/// automatic sweep would have minted an identity inside every older generation
+/// it touched and then offered those fabrications back to the user as things it
+/// had "found". A search that writes cannot be run behind someone's back.
+///
+/// Adopting still requires a click and still raises both consent prompts. Only
+/// the looking is automatic, and only a genuine hit is ever mentioned: a user
+/// with nothing stranded sees nothing, exactly like the registry sweep.
+async function detectStranded() {
+  if (!ante || deployments.delegate.superseded.length === 0) return;
+  try {
+    const search = await ante.findStrandedIdentities(deployments.delegate.superseded);
+    if (search.found.length === 0) return;
+
+    const details = $("recovery-previous") as HTMLDetailsElement;
+    details.open = true;
+    const status = $("previous-status");
+    status.hidden = false;
+    status.textContent =
+      search.found.length === 1
+        ? "An earlier version of ante on this node holds a different identity. You can move it here."
+        : `${search.found.length} earlier versions of ante on this node hold identities. You can move one here.`;
+    renderStranded(search.found, status);
+  } catch {
+    // A failed background look is not news. The button is still there.
   }
 }
 
@@ -169,21 +201,35 @@ async function findPrevious() {
       return;
     }
 
-    status.textContent = `found ${search.found.length}`;
-    for (const hit of search.found) {
-      const li = document.createElement("li");
-      const label = document.createElement("code");
-      label.textContent = fingerprint(hit.verifyingKey);
-      const take = document.createElement("button");
-      take.textContent = "Use this identity";
-      take.addEventListener("click", () => void adoptPrevious(hit, take, status));
-      li.append(label, take);
-      list.appendChild(li);
-    }
+    status.textContent =
+      search.found.length === 1
+        ? "Found an earlier identity on this node."
+        : `Found ${search.found.length} earlier identities on this node.`;
+    renderStranded(search.found, status);
   } catch (err) {
     status.textContent = `failed: ${(err as Error).message}`;
   } finally {
     btn.disabled = false;
+  }
+}
+
+/// Render the stranded identities as a pick-one list. Shared by the automatic
+/// look on load and the manual button, so both offer the same thing.
+function renderStranded(
+  found: { delegate: { key: string; codeHash: string }; verifyingKey: Uint8Array }[],
+  status: HTMLElement,
+) {
+  const list = $("previous-list");
+  list.innerHTML = "";
+  for (const hit of found) {
+    const li = document.createElement("li");
+    const label = document.createElement("code");
+    label.textContent = fingerprint(hit.verifyingKey);
+    const take = document.createElement("button");
+    take.textContent = "Use this identity";
+    take.addEventListener("click", () => void adoptPrevious(hit, take, status));
+    li.append(label, take);
+    list.appendChild(li);
   }
 }
 

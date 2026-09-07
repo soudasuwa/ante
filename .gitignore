@@ -8,3 +8,4 @@ dist
 # id). The committed embedded.stub.ts is copied in by `prepare` as a fallback.
 /client/src/embedded.ts
 /site/whitepaper.html
+.artifact-build-stamp
