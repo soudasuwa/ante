@@ -11,9 +11,9 @@
 # code_hash here plus unchanged params means a stable address. The live
 # instance ids are in DEPLOYMENTS.md.
 [delegate]
-code_hash = "92372684b18ad42d7762138351eeab49344cd378c0b3f39da1a4b23603b05d94"
-key = "3631e9328860295d00526b3ee1535bce5c5f6bf8afe3aa2624aff5e36b074915"
+code_hash = "3b831048a0dd20f8efa5793cecad59f949f2c68a3fea81ffa958613d7436efcb"
+key = "84b825053c1560bcdc7a7a1a3e08096e8b5d231f0af3a30e887ca1f18adf0411"
 
 [contracts]
-ante_registry_code_hash = "77b0a2d0b92e70d9d7db5df8f64c97af9bba875d338d75d543f92f3994ec7f00"
-guestbook_code_hash = "2d04082a6df1fcd3e30809ed72ae5e52485a75fbc31b62535baee9ce5e95bcbf"
+ante_registry_code_hash = "73f4d5de0ca0448ecd14f80c538ef88b4d715bcafb0739cbd55a3c9ab01198e9"
+guestbook_code_hash = "bf660dcd493d1d86eb34b410bbcc511b9535cae5dc3829a9e284a5ae6914950c"

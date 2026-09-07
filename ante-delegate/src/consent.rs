@@ -130,12 +130,16 @@ pub fn emit_commit_prompt(
 ) -> Result<Vec<OutboundDelegateMsg>, DelegateError> {
     let fingerprint = ante_core::fingerprint(identity_vk);
     let caller = caller_label(origin);
+    // Tense matters here. By the time this is on screen the grinding is
+    // finished; what is being asked for is the signature. "wants to spend
+    // proof of work" read as though the work were about to start, which made
+    // the prompt describe a different action than the one it authorises.
     let text = format!(
-        "{caller} wants to spend proof of work on your ante identity {fingerprint}.\n\n\
-         Purpose: {purpose}\n\
-         This proof demonstrates {achieved_bits} bits of work.\n\n\
-         Allow signs one proof. Always allow also stops asking for this app \
-         until you revoke it. Your key is never revealed."
+        "{caller} wants to sign with your ante identity {fingerprint}.\n\n\
+         The work is already done: {achieved_bits} bits.\n\
+         For: {purpose}\n\n\
+         Allow signs this once. Always allow stops asking for this app until \
+         you revoke it. Your key itself is never revealed."
     );
     raise(
         env,

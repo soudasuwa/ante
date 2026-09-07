@@ -6,7 +6,7 @@
 //! format.
 //!
 //! To regenerate after a **deliberate** format change:
-//! `cargo run -p ante-core --example print_vector`, then
+//! `cargo run -p ante-core --features testvec --example print_vector`, then
 //! paste the new `proof_cbor_hex` / `challenge_hex` into both pin sites. Any
 //! such change is breaking for every proof already stored anywhere.
 #![doc(hidden)]

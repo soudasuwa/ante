@@ -37,7 +37,7 @@ import {
 /// republishing the site, which only the key holder can do. That is the same
 /// trust root, with nothing extra to run. To point a local build somewhere
 /// else, edit this line and rebuild.
-const GUESTBOOK_CONTRACT_ID = "3haJKAbJzRXTem9fZw8SrKTjfZjVfVK3KzzB6YnXwbpL";
+const GUESTBOOK_CONTRACT_ID = "FFAmyrCBVnMpEcC515gKWnxK2HnrphSZ3Xj6ce8Pkmhw";
 
 /// Must match the parameters the contract was published with
 /// (`ANTE_GUESTBOOK_PURPOSE` / `ANTE_GUESTBOOK_MIN_BITS` in the publish script).

@@ -12,10 +12,14 @@ set -euo pipefail
 CARGO_HOME_DIR="${CARGO_HOME:-$HOME/.cargo}"
 RUSTUP_HOME_DIR="${RUSTUP_HOME:-$HOME/.rustup}"
 CRATE_DIR="$(pwd)"
+# The whole worktree, so a path dependency beside this crate (ante-core) is
+# remapped too — remapping only $CRATE_DIR leaves its absolute path in rodata.
+WORKTREE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 export RUSTFLAGS="${RUSTFLAGS:-} \
   --remap-path-prefix=$CARGO_HOME_DIR/registry/src=/cargo-registry \
   --remap-path-prefix=$RUSTUP_HOME_DIR=/rustup \
+  --remap-path-prefix=$WORKTREE_DIR=/ante \
   --remap-path-prefix=$CRATE_DIR=/crate"
 
 cargo build --target wasm32-unknown-unknown --release "$@"
@@ -29,7 +33,7 @@ WASM="$(find target/wasm32-unknown-unknown/release -maxdepth 1 -name '*.wasm' -p
 echo "wasm: $WASM ($(wc -c < "$WASM") bytes)"
 command -v b3sum >/dev/null 2>&1 && echo "code_hash: $(b3sum --no-names "$WASM")"
 
-for leak in "$CARGO_HOME_DIR" "$RUSTUP_HOME_DIR" "$CRATE_DIR"; do
+for leak in "$CARGO_HOME_DIR" "$RUSTUP_HOME_DIR" "$WORKTREE_DIR" "$CRATE_DIR" "$HOME"; do
   if grep -a -q -F "$leak" "$WASM"; then
     echo "ERROR: '$leak' is embedded in the WASM — the contract id would be machine-specific." >&2
     exit 1

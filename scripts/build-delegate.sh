@@ -28,10 +28,26 @@ DELEGATE_DIR="$REPO_ROOT/ante-delegate"
 cd "$DELEGATE_DIR"
 
 CARGO_HOME_DIR="${CARGO_HOME:-$HOME/.cargo}"
+RUSTUP_HOME_DIR="${RUSTUP_HOME:-$HOME/.rustup}"
+WORKTREE_DIR="$REPO_ROOT"
 
 # Appended so a caller's RUSTFLAGS still apply — though setting your own means a
 # different hash. The canonical build is this script with nothing extra set.
-export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$CARGO_HOME_DIR/registry/src=/cargo-registry"
+#
+# All three prefixes, matching build-contract.sh. Remapping only the cargo
+# registry (as this did until the guard caught it) still let
+# $RUSTUP_HOME/toolchains/.../library/std/... through, so the delegate carried
+# the builder's home directory and no two machines agreed on its key.
+#
+# The third is the whole worktree, not just this crate: the delegate links
+# ante-core, which sits beside it, and `to_cbor`'s expect() puts
+# ante-core/src/lib.rs into rodata. Remapping only $DELEGATE_DIR left that
+# absolute path behind — the same file whose line numbers already re-key this
+# artifact.
+export RUSTFLAGS="${RUSTFLAGS:-} \
+  --remap-path-prefix=$CARGO_HOME_DIR/registry/src=/cargo-registry \
+  --remap-path-prefix=$RUSTUP_HOME_DIR=/rustup \
+  --remap-path-prefix=$WORKTREE_DIR=/ante"
 
 cargo build --target wasm32-unknown-unknown --release "$@"
 
@@ -42,11 +58,14 @@ if command -v b3sum >/dev/null 2>&1; then
     echo "code_hash: $(b3sum --no-names "$WASM")"
 fi
 
-# Fail loudly rather than ship a machine-specific binary.
-LEAKED="$(grep -a -c -F "$CARGO_HOME_DIR" "$WASM" || true)"
-if [ "${LEAKED:-0}" -ne 0 ]; then
-    echo "ERROR: absolute path(s) from $CARGO_HOME_DIR are embedded in the WASM." >&2
-    echo "This build is machine-specific and must not be published — the delegate" >&2
-    echo "key would be one nobody else can recompute." >&2
-    exit 1
-fi
+# Fail loudly rather than ship a machine-specific binary. Check every prefix we
+# remap, not just the cargo registry — the missing $RUSTUP_HOME check is exactly
+# how a leak survived here unnoticed.
+for leak in "$CARGO_HOME_DIR" "$RUSTUP_HOME_DIR" "$WORKTREE_DIR" "$HOME"; do
+    if grep -a -q -F "$leak" "$WASM"; then
+        echo "ERROR: '$leak' is embedded in the WASM." >&2
+        echo "This build is machine-specific and must not be published — the delegate" >&2
+        echo "key would be one nobody else can recompute." >&2
+        exit 1
+    fi
+done

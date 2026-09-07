@@ -1,0 +1,20 @@
+# Pinned, because the compiler version is part of every artifact's identity.
+#
+# rustc bakes `/rustc/<commit-hash>/library/...` into the binary for std's own
+# source paths — no --remap-path-prefix removes it, because it is already the
+# compiler's substituted form. So a different rustc produces different bytes,
+# which produces a different delegate key and different contract addresses.
+#
+# Without this pin "reproducible" only ever meant "on one machine": CI installs
+# whatever stable is that day and disagrees with every developer. With it, any
+# checkout on any machine rebuilds the same artifacts.
+#
+# Bumping this line is a deliberate re-key. Batch it with other pending
+# changes, run `ANTE_ACCEPT_REKEY=1 ./scripts/check-keys.sh`, and say so in the
+# release notes — every stored identity has to be restored from its recovery
+# code.
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

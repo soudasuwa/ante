@@ -13,9 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      # No toolchain version here on purpose: rust-toolchain.toml is the single
+      # source of truth, so CI and every developer compile with the same rustc.
+      # A floating "stable" would silently re-key the delegate on each Rust
+      # release, because rustc bakes /rustc/<commit>/ into the binary.
+      - name: install the pinned toolchain
+        run: rustup show
       - uses: Swatinem/rust-cache@v2
 
       - name: workspace — fmt / clippy / test
@@ -23,6 +26,11 @@ jobs:
           cargo fmt --all --check
           cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace
+
+      # `testvec` is off by default so it never reaches a contract WASM, which
+      # means --all-targets above skips the example that requires it.
+      - name: feature-gated targets
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       # The delegate and the contracts are separate crates (own Cargo.lock) so
       # a workspace `cargo update` cannot re-key them. Check each on its own.
@@ -37,9 +45,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+      - name: install the pinned toolchain
+        run: rustup show          # rust-toolchain.toml carries the wasm target
       - uses: Swatinem/rust-cache@v2
 
       # build-delegate.sh greps the WASM for absolute registry paths and fails

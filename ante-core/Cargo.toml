@@ -6,6 +6,17 @@ license.workspace = true
 repository.workspace = true
 description = "Proof-of-work identity commitments for Freenet apps: the shared primitive and verifier."
 
+[features]
+# Exposes `ante_core::testvec`, the pinned cross-implementation vector. Test and
+# tooling only — a contract or delegate linking ante-core must NOT enable it:
+# it has no business in a consumer's public API surface.
+testvec = []
+
+# Needs `testvec` to reach the fixtures it prints.
+[[example]]
+name = "print_vector"
+required-features = ["testvec"]
+
 [dependencies]
 ed25519-dalek = { workspace = true }
 serde = { workspace = true }

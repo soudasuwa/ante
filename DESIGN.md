@@ -160,12 +160,17 @@ Two guards make that concrete, both run in CI:
   is why `wasm-opt` is *not* run: it is deterministic only for a fixed version,
   and "is binaryen installed" is not a property the key may depend on.)
 
-Deferred to the next deliberate re-key, because each would move the key on its
-own for no user-visible gain:
+Reproducibility is across *machines*, not just rebuilds on one. Two things were
+needed for that, and both were missing until CI disagreed with a laptop:
 
-- Put `ante_core::testvec` behind a `testvec` feature so it is not public API.
-  (The linker already eliminates it — contract WASMs are byte-identical either
-  way — so this is hygiene, not size.)
+- `rust-toolchain.toml` pins rustc. The compiler substitutes
+  `/rustc/<commit-hash>/` for std's own source paths, which no
+  `--remap-path-prefix` can remove — so a floating `stable` re-keys every
+  artifact on each Rust release.
+- The remaps cover the whole worktree, not just the crate being built. The
+  delegate links `ante-core` from beside it, and `to_cbor`'s `expect()` put
+  `ante-core/src/lib.rs` — an absolute path — into rodata. `build-delegate.sh`
+  also only *checked* for `$CARGO_HOME`, which is why the leak survived.
 
 The committed per-crate `Cargo.lock` prevents *accidental* re-keys. For the
 delegate, `ExportIdentity` / `ImportIdentity` already give the user a manual
