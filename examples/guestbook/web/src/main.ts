@@ -29,7 +29,7 @@ import {
 // expected tries is 2^bits. Wider bands (or a 28+ tier) would be decorative —
 // nobody grinds for 20 minutes to sign a guestbook.
 const TIERS = [
-  { min: 24, label: "24+ bits", effort: "minutes of work" },
+  { min: 24, label: "24+ bits", effort: "minutes" },
   { min: 22, label: "22–23 bits", effort: "~30 seconds" },
   { min: 20, label: "20–21 bits", effort: "~10 seconds" },
   { min: 18, label: "18–19 bits", effort: "~2 seconds" },
