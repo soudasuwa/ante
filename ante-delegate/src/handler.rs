@@ -24,6 +24,7 @@ pub fn handle_simple(key: &SigningKey, request: &AnteRequest) -> AnteResponse {
 
         // Routed in lib.rs, not here.
         AnteRequest::Commit { .. }
+        | AnteRequest::HasIdentity
         | AnteRequest::ListGrants
         | AnteRequest::RevokeGrant { .. }
         | AnteRequest::ExportIdentity

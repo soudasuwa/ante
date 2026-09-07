@@ -171,12 +171,23 @@ export class AnteClient {
         codeHashBytes: Array.from(hexToBytes(gen.codeHash)),
       };
       try {
-        const reply = await sendToDelegate(this.client, address, cborEncode("GetIdentity"));
-        if (reply.payloads.length === 0) {
+        // HasIdentity first, because it is a pure read. GetIdentity creates on
+        // miss, so probing with it mints an identity inside the generation
+        // being probed and then reports that fresh key as a stranded identity —
+        // the search fabricating its own result. Only fall back to GetIdentity
+        // for generations published before HasIdentity existed, which reject it
+        // as malformed; their WASM cannot be changed, so create-on-probe is
+        // unavoidable there and is confined to them.
+        let parsed = await this.probe(address, "HasIdentity");
+        if (parsed?.variant === "Error") parsed = await this.probe(address, "GetIdentity");
+
+        if (!parsed) {
           search.unresponsive.push(gen);
           continue;
         }
-        const parsed = enumVariant(cborDecode(reply.payloads[0]));
+        // A definite "nothing here" — not silence. Neither found nor
+        // unresponsive, so the UI can say the search actually concluded.
+        if (parsed.variant === "NoIdentity") continue;
         if (parsed.variant !== "Identity") {
           search.unresponsive.push(gen);
           continue;
@@ -353,6 +364,19 @@ export class AnteClient {
     const req: CborValue = { RevokeGrant: { origin: origin ? Array.from(origin) : null } };
     const reply = await this.oneShot(req);
     expect(reply.variant, "Revoked");
+  }
+
+  /// Send one request to an arbitrary delegate generation and decode its
+  /// answer, or null if it said nothing. Never throws for a delegate-level
+  /// error: an `Error` reply is a real answer here (it is how an older
+  /// generation rejects a request it does not know), and the caller decides.
+  private async probe(
+    address: DelegateAddress,
+    request: CborValue,
+  ): Promise<{ variant: string; fields: CborValue | null } | null> {
+    const reply = await sendToDelegate(this.client, address, cborEncode(request));
+    if (reply.payloads.length === 0) return null;
+    return enumVariant(cborDecode(reply.payloads[0]));
   }
 
   private async oneShot(request: CborValue): Promise<{ variant: string; fields: CborValue | null }> {

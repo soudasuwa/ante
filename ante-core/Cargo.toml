@@ -7,6 +7,17 @@ repository.workspace = true
 description = "Proof-of-work identity commitments for Freenet apps: the shared primitive and verifier."
 
 [features]
+default = ["protocol"]
+
+# The app<->delegate wire protocol (`AnteRequest` / `AnteResponse`). Default-on
+# so consumers get it without thinking, but the CONTRACTS turn it off with
+# `default-features = false`: they only ever touch `AnteProof` and `registry`,
+# and leaving the protocol compiled into them meant that adding a request
+# variant — a change no contract can observe — moved both contract addresses
+# and stranded every level and every post. Isolating it makes a delegate
+# protocol change cost a delegate re-key and nothing else.
+protocol = []
+
 # Exposes `ante_core::testvec`, the pinned cross-implementation vector. Test and
 # tooling only — a contract or delegate linking ante-core must NOT enable it:
 # it has no business in a consumer's public API surface.

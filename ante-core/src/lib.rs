@@ -41,6 +41,7 @@
 
 pub mod pow;
 pub mod proof;
+#[cfg(feature = "protocol")]
 pub mod protocol;
 pub mod registry;
 
@@ -51,6 +52,7 @@ pub mod registry;
 pub mod testvec;
 
 pub use proof::{fingerprint, AnteProof, VerifyError};
+#[cfg(feature = "protocol")]
 pub use protocol::{AnteRequest, AnteResponse};
 
 use serde::{de::DeserializeOwned, Serialize};

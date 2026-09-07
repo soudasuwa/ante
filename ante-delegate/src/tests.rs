@@ -11,7 +11,7 @@ use freenet_stdlib::prelude::{
 
 use ante_core::{pow, proof::AnteProof, AnteRequest, AnteResponse};
 
-use crate::env::TestEnv;
+use crate::env::{DelegateEnv, TestEnv};
 use crate::{consent, dispatch, identity};
 
 const ENTROPY: [u8; 32] = [0x11; 32];
@@ -43,6 +43,49 @@ fn decode_reply(out: &[OutboundDelegateMsg]) -> AnteResponse {
 
 fn run(env: &mut TestEnv, origin: &MessageOrigin, req: AnteRequest) -> Vec<OutboundDelegateMsg> {
     dispatch(env, Some(origin), req).expect("dispatch ok")
+}
+
+// ---------------------------------------------------------------------------
+// HasIdentity — the probe that must not write
+// ---------------------------------------------------------------------------
+
+#[test]
+fn has_identity_reports_absence_without_creating_one() {
+    let mut env = env();
+    let probe = decode_reply(&run(&mut env, &origin_a(), AnteRequest::HasIdentity));
+    assert_eq!(probe, AnteResponse::NoIdentity);
+
+    // The whole point: probing must leave the store untouched. If HasIdentity
+    // created a key the way GetIdentity does, a search across older generations
+    // would mint identities and then report them as stranded ones it "found" —
+    // fabricating the thing it claims to have discovered.
+    assert!(
+        env.get_secret(b"ante:identity:v1:primary").is_none(),
+        "HasIdentity must not persist an identity"
+    );
+
+    // And it must still answer NoIdentity the second time, not drift.
+    let again = decode_reply(&run(&mut env, &origin_a(), AnteRequest::HasIdentity));
+    assert_eq!(again, AnteResponse::NoIdentity);
+}
+
+#[test]
+fn has_identity_reports_the_key_once_one_exists() {
+    let mut env = env();
+    let created = decode_reply(&run(&mut env, &origin_a(), AnteRequest::GetIdentity));
+    let probed = decode_reply(&run(&mut env, &origin_a(), AnteRequest::HasIdentity));
+    assert_eq!(created, probed);
+}
+
+#[test]
+fn has_identity_does_not_prompt() {
+    let mut env = env();
+    let out = run(&mut env, &origin_a(), AnteRequest::HasIdentity);
+    assert_eq!(out.len(), 1, "a probe must answer in one message, not prompt");
+    assert!(
+        env.context_is_empty(),
+        "a probe must not park a pending prompt"
+    );
 }
 
 // ---------------------------------------------------------------------------

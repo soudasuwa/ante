@@ -71,6 +71,21 @@ pub enum AnteRequest {
     /// replaced (and its "always allow" grants are cleared). Re-importing the
     /// current seed is a no-op.
     ImportIdentity { seed: Vec<u8> },
+
+    /// Report whether this delegate generation holds an identity, WITHOUT
+    /// creating one. No prompt.
+    ///
+    /// Exists because [`AnteRequest::GetIdentity`] creates on miss, which makes
+    /// it unusable for probing: asking an older generation "do you have an
+    /// identity?" with `GetIdentity` mints one there as a side effect, and the
+    /// caller then sees a key that differs from the current one and reports it
+    /// as a stranded identity it just fabricated. A search must not write.
+    ///
+    /// Generations published before this variant existed will reject it as a
+    /// malformed request, so a prober has to fall back to `GetIdentity` for
+    /// them — accepting create-on-probe only where the WASM can no longer be
+    /// changed.
+    HasIdentity,
 }
 
 /// Responses the ante delegate sends back.
@@ -109,4 +124,10 @@ pub enum AnteResponse {
     /// The request could not be served (malformed payload, nonce below
     /// `min_bits`, purpose too long, entropy failure, ...).
     Error { message: String },
+
+    /// This delegate generation holds no identity, in answer to
+    /// [`AnteRequest::HasIdentity`]. Distinct from `Error` because "there is
+    /// nothing here" is an answer, not a failure — and the difference decides
+    /// whether a caller should keep looking.
+    NoIdentity,
 }
